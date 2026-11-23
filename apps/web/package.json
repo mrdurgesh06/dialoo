@@ -1,0 +1,26 @@
+{
+  "name": "@dialoo/web",
+  "private": true,
+  "version": "4.0.0",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "lucide-react": "0.468.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/geolocation": "8.2.4",
+    "@capacitor/network": "8.0.1",
+    "@capacitor/haptics": "8.0.2"
+  },
+  "devDependencies": {
+    "vite": "5.4.11",
+    "@vitejs/plugin-react": "4.3.4"
+  }
+}

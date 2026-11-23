@@ -1,0 +1,65 @@
+server:
+  port: ${PORT:8080}
+spring:
+  application:
+    name: dialoo-api
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    time-zone: UTC
+    default-property-inclusion: always
+  flyway:
+    enabled: true
+    # Demo marketplace data (db/demo) is loaded by default for local testing.
+    # For staging/production set FLYWAY_EXTRA_LOCATION=classpath:db/none so no demo providers are created.
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
+    ignore-migration-patterns: "*:missing"
+    validate-on-migrate: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
+    refresh-expiration-days: ${JWT_REFRESH_DAYS:30}
+  otp:
+    ttl-seconds: ${OTP_TTL_SECONDS:300}
+    resend-cooldown-seconds: ${OTP_RESEND_SECONDS:30}
+    max-requests-per-10-min: 5
+    max-attempts: 5
+    max-requests-per-ip-10-min: 20
+    dev-mode: ${OTP_DEV_MODE:false}
+  cors:
+    # Comma-separated list of allowed browser origins
+    allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+
+  geo:
+    # Reverse geocoding for "Use my current location". Public Nominatim is for light use only - use your own/paid server in production.
+    nominatim-url: ${GEO_NOMINATIM_URL:https://nominatim.openstreetmap.org}
+    user-agent: ${GEO_USER_AGENT:Dialoo/4.0 (set GEO_USER_AGENT with your contact email)}
+
+  sms:
+    provider: ${SMS_PROVIDER:log}
+    twilio:
+      account-sid: ${TWILIO_ACCOUNT_SID:}
+      auth-token: ${TWILIO_AUTH_TOKEN:}
+      from-number: ${TWILIO_FROM_NUMBER:}
+
+# Local-development admin bootstrap only. Override these environment variables for your own setup.
+# Do not deploy these defaults to a public server.

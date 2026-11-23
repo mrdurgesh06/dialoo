@@ -1,0 +1,86 @@
+# Render Blueprint for Dialoo: API (Docker web service) + website (static site).
+# The database is NOT created here: Dialoo needs MySQL 8 (Render only offers PostgreSQL). Use your external MySQL (Azure).
+# Setup steps: docs/DEPLOY-RENDER.md
+services:
+  # ------------------------------------------------------------------ API
+  - type: web
+    name: dialoo-api
+    runtime: docker
+    plan: free                         # free = sleeps after 15 min idle, 512 MB RAM. Use "starter" for real users.
+    region: singapore                  # closest Render region to India. Pick the one nearest your MySQL server.
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - apps/api/**
+    envVars:
+      # --- database (Azure MySQL) ---
+      - key: DB_URL
+        sync: false                    # jdbc:mysql://<server>.mysql.database.azure.com:3306/<db>?sslMode=REQUIRED&serverTimezone=UTC&characterEncoding=UTF-8
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_POOL_SIZE
+        value: "5"                     # small pool for the free instance
+      # --- security ---
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_PHONE
+        sync: false                    # your real 10-digit mobile (admin login sends an OTP to it)
+      - key: ADMIN_PASSWORD
+        sync: false                    # 12+ chars, unique, never reuse an old/example password
+      - key: ADMIN_NAME
+        value: Dialoo Admin
+      # --- website address for CORS (set after the website is created) ---
+      - key: FRONTEND_ORIGIN
+        sync: false                    # https://<your-web-service>.onrender.com   (no trailing slash; comma-separate more origins)
+      # --- testing mode: OTP is shown on screen. Set OTP_DEV_MODE=false + real SMS before real users. ---
+      - key: OTP_DEV_MODE
+        value: "false"
+      - key: SMS_PROVIDER
+        value: log
+      # --- demo marketplace data. For production use classpath:db/none ---
+      - key: SPRING_FLYWAY_LOCATIONS
+        value: classpath:db/migration
+      - key: GEO_USER_AGENT
+        sync: false                    # e.g. Dialoo/5.0 (you@example.com)
+
+  # ------------------------------------------------------------------ WEBSITE
+  - type: web
+    name: dialoo-web
+    runtime: static
+    region: singapore
+    buildCommand: cd apps/web && npm ci && npm run build
+    staticPublishPath: ./apps/web/dist
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - apps/web/**
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_BASE_URL
+        sync: false                    # https://<your-api-service>.onrender.com/api/v1   (needed at build time)
+    routes:
+      - type: rewrite                  # /admin and every app route open index.html
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
