@@ -12,6 +12,6 @@ public class LoggingSmsSender implements SmsSender {
   private static final Logger log = LoggerFactory.getLogger(LoggingSmsSender.class);
   @Override public void send(String mobile, String message) {
     String masked = mobile.length() > 4 ? "******" + mobile.substring(mobile.length() - 4) : "****";
-    log.warn("[DEV SMS ONLY] No real SMS sent to {}. Configure app.sms.provider=twilio for delivery.", masked);
+    log.warn("[DEV SMS ONLY] No real SMS sent to {}. Set SMS_PROVIDER=msg91 (or twilio) for real delivery.", masked);
   }
 }

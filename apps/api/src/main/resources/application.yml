@@ -55,7 +55,11 @@ app:
     user-agent: ${GEO_USER_AGENT:Dialoo/4.0 (set GEO_USER_AGENT with your contact email)}
 
   sms:
-    provider: ${SMS_PROVIDER:log}
+    provider: ${SMS_PROVIDER:log}   # log | twilio | msg91
+    msg91:
+      auth-key: ${MSG91_AUTH_KEY:}
+      template-id: ${MSG91_TEMPLATE_ID:}
+      country-code: ${MSG91_COUNTRY_CODE:91}
     twilio:
       account-sid: ${TWILIO_ACCOUNT_SID:}
       auth-token: ${TWILIO_AUTH_TOKEN:}

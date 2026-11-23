@@ -1,5 +1,10 @@
 # Dialoo — changelog
 
+## MSG91 real OTP SMS
+- New `Msg91SmsSender` (`SMS_PROVIDER=msg91`): OTP is still generated, HMAC-hashed, rate-limited and verified by `OtpService`; MSG91 OTP API v5 only delivers it through your DLT template (`##OTP##`). Covers customer OTP login, forgot password and admin 2FA/reset.
+- New env vars: `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`, `MSG91_COUNTRY_CODE` (default 91). `render.yaml` now defaults to `SMS_PROVIDER=msg91`.
+- `SmsSender` gained `sendOtp(...)` (default falls back to `send`), so Twilio/log senders are unchanged.
+
 ## Repository restructure + Render-ready (latest)
 - Monorepo layout: `apps/api`, `apps/web`, `apps/mobile`, `docs`, `scripts`, `.github`. Capacitor (android/ios) moved out of the website into `apps/mobile` (webDir `../web/dist`).
 - Web `src` is feature-based: `features/{auth,customer,provider,admin}`, `shared`, `styles`. Admin `pages.jsx`/`pages2.jsx` renamed to `OperationsPages.jsx`/`ManagementPages.jsx`; `customer/parts.jsx` moved to `shared/parts.jsx` (used by admin too).

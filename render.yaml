@@ -41,7 +41,13 @@ services:
       - key: OTP_DEV_MODE
         value: "false"
       - key: SMS_PROVIDER
-        value: log
+        value: msg91                   # log = no real SMS | msg91 | twilio
+      - key: MSG91_AUTH_KEY
+        sync: false                    # MSG91 dashboard -> Authkey
+      - key: MSG91_TEMPLATE_ID
+        sync: false                    # DLT-approved OTP template id (template text must contain ##OTP##)
+      - key: MSG91_COUNTRY_CODE
+        value: "91"
       # --- demo marketplace data. For production use classpath:db/none ---
       - key: SPRING_FLYWAY_LOCATIONS
         value: classpath:db/migration

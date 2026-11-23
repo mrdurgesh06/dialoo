@@ -72,7 +72,7 @@ jdbc:mysql://<server>.mysql.database.azure.com:3306/dialoodb?sslMode=REQUIRED&se
 
 ## Production checklist (real users se pehle)
 - [ ] Render plan `free` → `starter` (sleep band, zyada RAM)
-- [ ] `OTP_DEV_MODE=false`, `SMS_PROVIDER=twilio` + `TWILIO_*` variables
+- [ ] `OTP_DEV_MODE=false`, `SMS_PROVIDER=msg91` + `MSG91_AUTH_KEY` + `MSG91_TEMPLATE_ID` (ya `twilio` + `TWILIO_*`)
 - [ ] `FLYWAY_EXTRA_LOCATION=classpath:db/none` (demo providers nahi)
 - [ ] Custom domain (API + website), `FRONTEND_ORIGIN` me wahi domain
 - [ ] Azure MySQL: automated backups on, firewall sirf Render IPs ke liye
@@ -91,3 +91,16 @@ jdbc:mysql://<server>.mysql.database.azure.com:3306/dialoodb?sslMode=REQUIRED&se
 
 ## Android / iOS app ko is API se jodna
 `apps/web/.env.production` me `VITE_API_BASE_URL=https://<api>.onrender.com/api/v1` daalein aur `MOBILE-APP.md` ke release steps chalayein. Backend ke `FRONTEND_ORIGIN` me `https://localhost,capacitor://localhost` bhi comma se jodein.
+
+
+## MSG91 se asli OTP SMS
+
+1. MSG91 me login → **Authkey** copy karein (Dashboard → API / Authkey).
+2. **SMS → Templates** me OTP template banayein (DLT approved). Template text me `##OTP##` variable hona zaroori hai, jaise: `Your Dialoo verification code is ##OTP##. Do not share it with anyone.` Template ID copy karein.
+3. Render → `dialoo-api` → Environment me ye set karein:
+   - `SMS_PROVIDER=msg91`
+   - `MSG91_AUTH_KEY=<authkey>`
+   - `MSG91_TEMPLATE_ID=<template id>`
+   - `OTP_DEV_MODE=false`
+4. Redeploy. Ab customer login, forgot password aur admin login ka OTP asli SMS se aayega.
+5. SMS na aaye to Render logs me `MSG91 rejected OTP` line dekhein, aur MSG91 dashboard → Reports → OTP logs.

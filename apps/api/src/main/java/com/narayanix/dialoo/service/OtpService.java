@@ -66,7 +66,8 @@ public class OtpService {
     String otp = String.format("%06d", random.nextInt(1_000_000));
     db.update("INSERT INTO otp_verifications(mobile_number,otp_hash,purpose,expires_at,request_ip) VALUES(?,?,?,DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? SECOND),?)", mobile, hash(mobile, otp, purpose), purpose, ttlSeconds, ip);
     try {
-      sms.send(mobile, "Your Dialoo verification code is " + otp + ". It is valid for " + Math.max(1, ttlSeconds / 60) + " minutes. Do not share it with anyone.");
+      int ttlMinutes = Math.max(1, ttlSeconds / 60);
+      sms.sendOtp(mobile, otp, ttlMinutes, "Your Dialoo verification code is " + otp + ". It is valid for " + ttlMinutes + " minutes. Do not share it with anyone.");
     } catch (RuntimeException deliveryError) {
       // Do not leave an apparently usable OTP behind when the gateway rejects the send.
       db.update("UPDATE otp_verifications SET expires_at=UTC_TIMESTAMP() WHERE mobile_number=? AND purpose=? AND verified_at IS NULL", mobile, purpose);

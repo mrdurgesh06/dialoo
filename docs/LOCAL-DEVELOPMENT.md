@@ -65,7 +65,7 @@ Admin ke bell/notifications me booking placed, accepted, completed, cancelled, e
 - `ADMIN_PASSWORD` ab har restart par overwrite nahi hota. Password badalna ho to ek baar `$env:ADMIN_RESET_PASSWORD="true"` ke saath backend chalayein.
 - `ADMIN_PHONE` aur `ADMIN_PASSWORD` (12+ characters) **har environment me zaroori** hain (local me bhi); koi built-in admin login nahi hai. Set na ho to admin bootstrap skip ho jata hai.
 - Roles: `SUPPORT` (bookings dekhna/cancel), `ADMIN` (providers, users, catalog, offers, broadcast, audit), `SUPER_ADMIN` (sab kuch, settings, staff roles, sessions). Naya staff banane ke liye user ko `/admin → Users` me role badlein.
-- Pehli baar admin user bina SMS ke test karne ke liye local me dev OTP ka istemal hota hai; asli phone par SMS ke liye Twilio ki `SMS_PROVIDER=twilio` settings bharein.
+- Pehli baar admin user bina SMS ke test karne ke liye local me dev OTP ka istemal hota hai; asli phone par SMS ke liye `SMS_PROVIDER=msg91` + `MSG91_AUTH_KEY` + `MSG91_TEMPLATE_ID` set karein (Twilio ke liye `SMS_PROVIDER=twilio`).
 
 ## Migrations (database)
 Files: `apps/api/src/main/resources/db/migration/` (V1–V13 + `R__reporting_views.sql`), demo data `db/demo/`, undo scripts `db/rollback/`.
