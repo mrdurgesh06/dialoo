@@ -1,7 +1,6 @@
 package com.narayanix.dialoo.controller;
 
 import com.narayanix.dialoo.service.AuditService;
-import com.narayanix.dialoo.service.Msg91WidgetVerifier;
 import com.narayanix.dialoo.service.OtpService;
 import com.narayanix.dialoo.service.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,15 +17,14 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController @RequestMapping("/api/v1/auth")
 public class AuthController {
- private final JdbcTemplate db; private final PasswordEncoder encoder; private final TokenService tokens; private final OtpService otp; private final AuditService audit; private final Msg91WidgetVerifier widget;
- public AuthController(JdbcTemplate db,PasswordEncoder encoder,TokenService tokens,OtpService otp,AuditService audit,Msg91WidgetVerifier widget){this.db=db;this.encoder=encoder;this.tokens=tokens;this.otp=otp;this.audit=audit;this.widget=widget;}
+ private final JdbcTemplate db; private final PasswordEncoder encoder; private final TokenService tokens; private final OtpService otp; private final AuditService audit;
+ public AuthController(JdbcTemplate db,PasswordEncoder encoder,TokenService tokens,OtpService otp,AuditService audit){this.db=db;this.encoder=encoder;this.tokens=tokens;this.otp=otp;this.audit=audit;}
  public record Register(@NotBlank @Size(min=2,max=120) String fullName,@NotBlank @Pattern(regexp="[0-9+ -]{10,20}") String phone,@NotBlank @Size(min=8,max=72) String password,String email){}
  public record Login(@NotBlank String phone,@NotBlank String password){}
  public record ForgotRequest(@NotBlank String mobile){}
  public record PasswordReset(@NotBlank String mobile,@NotBlank @Pattern(regexp="[0-9]{6}") String otp,@NotBlank @Size(min=8,max=72) String newPassword){}
  public record OtpRequest(@NotBlank String mobile){}
  public record OtpVerify(@NotBlank String mobile,@NotBlank @Pattern(regexp="[0-9]{6}") String otp){}
- public record WidgetVerify(@NotBlank @Size(max=4000) String accessToken){}
  public record RefreshRequest(@NotBlank String refreshToken){}
  public record ProfileUpdate(@Size(min=2,max=120) String fullName,@Size(max=190) String email,@Pattern(regexp="en|hi") String preferredLanguage){}
 
@@ -45,27 +43,14 @@ public class AuthController {
  }
 
  // ---- New: passwordless OTP flow (SRS 10.1, 21) ----
- /** Tells the website how to run OTP login: local (server SMS) or msg91-widget (browser widget + server token check). */
- @GetMapping("/otp/config") public Map<String,Object> otpConfig(){
-   if(!widget.enabled()) return Map.of("mode","local");
-   return Map.of("mode","msg91-widget","widgetId",widget.widgetId(),"tokenAuth",widget.tokenAuth());
- }
- @PostMapping("/otp/widget-verify") public Map<String,Object> otpWidgetVerify(@Valid @RequestBody WidgetVerify r,HttpServletRequest req){
-   if(!widget.enabled()) throw new IllegalArgumentException("OTP widget login is not enabled");
-   return completeOtpLogin(widget.verify(r.accessToken()),req);
- }
  @PostMapping("/otp/request") public Map<String,Object> otpRequest(@Valid @RequestBody OtpRequest r,HttpServletRequest req){
-   if(widget.enabled()) throw new IllegalArgumentException("Please use the OTP widget to sign in");
    var issued=otp.request(r.mobile(),req.getRemoteAddr());
    Map<String,Object> out=new HashMap<>(); out.put("message","OTP sent"); out.put("expiresInSeconds",issued.expiresInSeconds()); out.put("resendInSeconds",issued.resendInSeconds());
    if(issued.devOtp()!=null) out.put("devOtp",issued.devOtp()); // only when app.otp.dev-mode=true
    return out;
  }
  @PostMapping("/otp/verify") public Map<String,Object> otpVerify(@Valid @RequestBody OtpVerify r,HttpServletRequest req){
-   if(widget.enabled()) throw new IllegalArgumentException("Please use the OTP widget to sign in");
-   return completeOtpLogin(otp.verify(r.mobile(),r.otp()),req);
- }
- private Map<String,Object> completeOtpLogin(String mobile,HttpServletRequest req){
+   String mobile=otp.verify(r.mobile(),r.otp());
    var rows=db.queryForList("SELECT id,phone,role,enabled FROM users WHERE phone IN (?,?) ORDER BY id LIMIT 1",mobile,"+91"+mobile);
    boolean isNew=rows.isEmpty();
    if(isNew){ db.update("INSERT INTO users(full_name,phone,password_hash,role,public_id) VALUES('Dialoo User',?,NULL,'CUSTOMER',UPPER(SUBSTRING(REPLACE(UUID(),'-',''),1,26)))",mobile); }

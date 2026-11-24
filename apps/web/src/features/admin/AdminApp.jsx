@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { adminApi, adminSession } from '../../shared/api.js';
+import { adminApi, adminSession, getOtpConfig } from '../../shared/api.js';
 import { Bell, NotificationList } from '../../shared/parts.jsx';
 import { LangContext, Sheet, ToastHost, Spinner } from '../../shared/ui.jsx';
 import { BookingsPage, Overview, ProvidersPage, UsersPage } from './OperationsPages.jsx';
@@ -46,11 +46,19 @@ function AdminLogin({ onDone, notice }) {
 
   const submitPwd = run(async () => {
     const r = await adminApi.login(id.trim(), pw);
-    if (r.mfaRequired) { setMfa(r); go('otp'); } else finish(r);
+    if (r.mfaRequired && r.otpMode === 'msg91-widget') {
+      const { msg91Send } = await import('../../shared/msg91.js');
+      await msg91Send(await getOtpConfig(), r.mobile); // OTP is sent by the MSG91 widget
+      setMfa(r); go('otp');
+    } else if (r.mfaRequired) { setMfa(r); go('otp'); } else finish(r);
   });
   const submitOtp = run(async () => {
     try {
-      const r = await adminApi.verify(mfa.mfaToken, otp);
+      let r;
+      if (mfa.otpMode === 'msg91-widget') {
+        const { msg91Verify } = await import('../../shared/msg91.js');
+        r = await adminApi.verifyWidget(mfa.mfaToken, await msg91Verify(await getOtpConfig(), otp));
+      } else r = await adminApi.verify(mfa.mfaToken, otp);
       if (r.mustChangePassword) { setChangeToken(r.changeToken); go('change'); } else finish(r);
     } catch (x) { if (/expired|start again/i.test(x.message)) { go('pwd'); setPw(''); } throw x; }
   });

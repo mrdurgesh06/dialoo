@@ -58,7 +58,7 @@ public class SecurityConfig {
       .authorizeHttpRequests(a -> a
         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/otp/**", "/api/v1/auth/password/forgot/**",
           "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/health", "/actuator/health/**").permitAll()
-        .requestMatchers("/api/v1/admin/auth/login", "/api/v1/admin/auth/verify", "/api/v1/admin/auth/forgot", "/api/v1/admin/auth/reset", "/api/v1/admin/auth/change-initial").permitAll()
+        .requestMatchers("/api/v1/admin/auth/login", "/api/v1/admin/auth/verify", "/api/v1/admin/auth/verify-widget", "/api/v1/admin/auth/forgot", "/api/v1/admin/auth/reset", "/api/v1/admin/auth/change-initial").permitAll()
         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/categories/**", "/api/v1/providers", "/api/v1/providers/**",
           "/api/v1/rentals", "/api/v1/projects", "/api/v1/subscription-plans", "/api/v1/feature-flags", "/api/v1/banners",
           "/api/v1/cities", "/api/v1/search/**", "/api/v1/geo/**", "/api/v1/coupons/available").permitAll()
