@@ -90,7 +90,7 @@ function Shell({ lang, setLang }) {
   else page = <div className="empty"><h3>Page not found</h3><button className="btn primary" onClick={() => go('/')}>Home</button></div>;
 
   const nav = [['/', House, t('Home', 'होम'), !p0], ['/browse', Compass, t('Explore', 'खोजें'), p0 === 'browse'], ['/bookings', ClipboardList, t('Bookings', 'बुकिंग'), p0 === 'bookings' || p0 === 'booking'], ['/profile', UserRound, t('Account', 'अकाउंट'), p0 === 'profile']];
-  if (isProvider) nav.splice(3, 0, ['/pro', HardHat, t('Provider', 'प्रोवाइडर'), p0 === 'pro']);
+  if (isProvider) nav.splice(3, 0, ['/pro', HardHat, t('Partner', 'पार्टनर'), p0 === 'pro']);
   const navButtons = nav.map(([to, Icon, label, on]) => <button key={to} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined} onClick={() => go(to)}><Icon size={20} strokeWidth={on ? 2.4 : 2} aria-hidden="true" /><span>{label}</span></button>);
   const live = active[0];
 

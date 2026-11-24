@@ -56,7 +56,7 @@ export function timeAgo(v) {
 export const dateTime = (v) => (v ? new Date(v).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 
 export const STATUS = {
-  REQUESTED: { label: 'Waiting for provider', hi: 'प्रोवाइडर का इंतज़ार', tone: 'amber' },
+  REQUESTED: { label: 'Waiting for Dialoo Partner', hi: 'Dialoo पार्टनर का इंतज़ार', tone: 'amber' },
   ACCEPTED: { label: 'Accepted', hi: 'स्वीकार', tone: 'blue' },
   ON_THE_WAY: { label: 'On the way', hi: 'रास्ते में', tone: 'blue' },
   IN_PROGRESS: { label: 'Work in progress', hi: 'काम चालू', tone: 'purple' },

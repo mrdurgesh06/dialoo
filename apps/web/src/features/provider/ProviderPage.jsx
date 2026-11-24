@@ -37,7 +37,7 @@ export default function ProviderPage({ id, fav, onFav, onBook }) {
         ))}
       </section>
       <section className="card">
-        <h3>{t('Customer reviews', 'ग्राहक रिव्यू')}</h3>
+        <h3>{t('Consumer reviews', 'कंज़्यूमर रिव्यू')}</h3>
         {p.reviews.length === 0 ? <p className="muted">{t('No reviews yet.', 'अभी कोई रिव्यू नहीं।')}</p> : p.reviews.map((r, i) => (
           <div className="review" key={i}><div className="row between"><b>{r.customer_name}</b><Stars value={r.rating} /></div><p>{r.comment || '—'}</p>{r.provider_response && <p className="reply"><CornerDownRight size={14} aria-hidden="true" /> {r.provider_response}</p>}<span className="muted small">{dateTime(r.created_at)}</span></div>
         ))}

@@ -12,7 +12,7 @@ export function haptic(style = 'light') {
 }
 
 /** Current GPS position. Asks permission on first use (native) or uses the browser prompt (web). */
-export async function getPosition(timeout = 12000) {
+export async function getPosition(timeout = 12000, maxAge = 30000) {
   if (isNative()) {
     let perm = await Geolocation.checkPermissions();
     const ok = (p) => p.location === 'granted' || p.coarseLocation === 'granted';
@@ -20,7 +20,7 @@ export async function getPosition(timeout = 12000) {
       perm = await Geolocation.requestPermissions({ permissions: ['location'] });
       if (!ok(perm)) { const e = new Error('Location permission denied'); e.code = 'DENIED'; throw e; }
     }
-    const p = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout, maximumAge: 30000 });
+    const p = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout, maximumAge: maxAge });
     return { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy };
   }
   return new Promise((resolve, reject) => {
@@ -28,7 +28,7 @@ export async function getPosition(timeout = 12000) {
     navigator.geolocation.getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
       (err) => { const e = new Error(err.code === 1 ? 'Location permission denied' : 'Could not get your location'); e.code = err.code === 1 ? 'DENIED' : 'FAILED'; reject(e); },
-      { enableHighAccuracy: true, timeout, maximumAge: 30000 },
+      { enableHighAccuracy: true, timeout, maximumAge: maxAge },
     );
   });
 }

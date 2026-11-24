@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { customerApi } from '../../shared/api.js';
 import { back, go } from '../../shared/router.js';
+import LiveTrack from './LiveTrack.jsx';
 import { Sheet, Spinner, StatusBadge, STATUS, dateTime, money, useT, useToast, usePolling } from '../../shared/ui.jsx';
 import { ArrowLeft, CarFront, Check, CircleCheck, CircleSlash, CircleX, Clock, FileText, Hourglass, MessageCircle, Package, PartyPopper, Phone, SendHorizontal, Star, Wrench } from 'lucide-react';
 
@@ -19,12 +20,12 @@ export default function Tracking({ id }) {
   const stepIdx = STEPS.findIndex((s) => s[0] === b.status);
   const active = ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY'].includes(b.status);
   const headline = {
-    REQUESTED: [t('Waiting for provider to accept', 'प्रोवाइडर के स्वीकार करने का इंतज़ार'), Hourglass],
-    ACCEPTED: [t('Provider accepted your booking', 'प्रोवाइडर ने बुकिंग स्वीकार की'), CircleCheck],
-    ON_THE_WAY: [t('Provider is on the way', 'प्रोवाइडर रास्ते में है'), CarFront],
+    REQUESTED: [t('Waiting for Dialoo Partner to accept', 'Dialoo पार्टनर के स्वीकार करने का इंतज़ार'), Hourglass],
+    ACCEPTED: [t('Dialoo Partner accepted your booking', 'Dialoo पार्टनर ने बुकिंग स्वीकार की'), CircleCheck],
+    ON_THE_WAY: [t('Dialoo Partner is on the way', 'Dialoo पार्टनर रास्ते में है'), CarFront],
     IN_PROGRESS: [t('Work in progress', 'काम चल रहा है'), Wrench],
     COMPLETED: [t('Service completed', 'सर्विस पूरी हुई'), PartyPopper],
-    CANCELLED: [t('Booking cancelled', 'बुकिंग रद्द'), CircleX], REJECTED: [t('Provider could not take this job', 'प्रोवाइडर यह काम नहीं ले सका'), CircleSlash], EXPIRED: [t('No response — booking expired', 'जवाब नहीं मिला — बुकिंग समाप्त'), Hourglass],
+    CANCELLED: [t('Booking cancelled', 'बुकिंग रद्द'), CircleX], REJECTED: [t('Dialoo Partner could not take this job', 'Dialoo पार्टनर यह काम नहीं ले सका'), CircleSlash], EXPIRED: [t('No response — booking expired', 'जवाब नहीं मिला — बुकिंग समाप्त'), Hourglass],
   }[b.status] || [b.status, Package];
 
   const HeroIcon = headline[1];
@@ -35,10 +36,12 @@ export default function Tracking({ id }) {
         <div className="big"><HeroIcon size={34} aria-hidden="true" /></div>
         <div><h2>{headline[0]}</h2><p>#{b.booking_code} · {b.category} {b.service_name ? `· ${b.service_name}` : ''}</p>
           {b.status === 'REQUESTED' && <p className="small">{t('We will notify you the moment they respond.', 'जवाब आते ही हम आपको बताएँगे।')}</p>}
-          {['ACCEPTED', 'ON_THE_WAY'].includes(b.status) && <p className="small"><Clock size={14} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('Usually arrives in', 'आमतौर पर पहुँचता है')} ~{b.eta_minutes} {t('min', 'मिनट')}</p>}
+          {b.status === 'ACCEPTED' && <p className="small"><Clock size={14} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('Usually arrives in', 'आमतौर पर पहुँचता है')} ~{b.eta_minutes} {t('min', 'मिनट')}</p>}
           {failed && b.cancel_reason && <p className="small">{t('Reason', 'कारण')}: {b.cancel_reason}</p>}
         </div>
       </section>
+
+      {b.status === 'ON_THE_WAY' && <LiveTrack bookingId={b.id} name={b.business_name} phone={b.provider_phone} fallbackEta={b.eta_minutes} />}
 
       {!failed && (
         <ol className="steps">
@@ -47,7 +50,7 @@ export default function Tracking({ id }) {
       )}
 
       {b.start_code && ['ACCEPTED', 'ON_THE_WAY'].includes(b.status) && (
-        <section className="code-card"><div><b>{t('Start code', 'स्टार्ट कोड')}</b><p className="small">{t('Share this with the provider only when they arrive and are ready to start.', 'प्रोवाइडर के पहुँचने और काम शुरू करने पर ही यह कोड बताएँ।')}</p></div>
+        <section className="code-card"><div><b>{t('Start code', 'स्टार्ट कोड')}</b><p className="small">{t('Share this with the Dialoo Partner only when they arrive and are ready to start.', 'Dialoo पार्टनर के पहुँचने और काम शुरू करने पर ही यह कोड बताएँ।')}</p></div>
           <div className="digits">{String(b.start_code).split('').map((d, i) => <span key={i}>{d}</span>)}</div></section>
       )}
 
@@ -69,7 +72,7 @@ export default function Tracking({ id }) {
           <div><span>{t('Service', 'सर्विस')}</span><span>{money(b.service_amount)}</span></div><div><span>{t('Visit & platform fee', 'विज़िट फ़ीस')}</span><span>{money(b.visit_fee)}</span></div>
           <div><span>{t('Taxes', 'टैक्स')}</span><span>{money(b.tax_amount)}</span></div>{Number(b.discount_amount) > 0 && <div className="save"><span>{t('Discount', 'छूट')} {b.coupon_code ? `(${b.coupon_code})` : ''}</span><span>− {money(b.discount_amount)}</span></div>}
           <div className="total"><span>{b.status === 'COMPLETED' ? t('Final amount', 'अंतिम राशि') : t('Estimated total', 'अनुमानित कुल')}</span><span>{money(b.final_amount || b.total_amount)}</span></div>
-          {b.status === 'COMPLETED' && <div><span>{t('Payment', 'भुगतान')}</span><span className={b.payment_status === 'PAID' ? 'ok' : 'warn'}>{b.payment_status === 'PAID' ? t('Paid', 'चुकाया') : t('Pay the provider directly', 'प्रोवाइडर को सीधे भुगतान करें')}</span></div>}
+          {b.status === 'COMPLETED' && <div><span>{t('Payment', 'भुगतान')}</span><span className={b.payment_status === 'PAID' ? 'ok' : 'warn'}>{b.payment_status === 'PAID' ? t('Paid', 'चुकाया') : t('Pay the Dialoo Partner directly', 'Dialoo पार्टनर को सीधे भुगतान करें')}</span></div>}
         </div>
       </section>
 
@@ -77,7 +80,7 @@ export default function Tracking({ id }) {
         <ul className="timeline">{(b.timeline || []).slice().reverse().map((e, i) => <li key={i}><b>{STATUS[e.to_status]?.label || e.to_status}</b><span>{dateTime(e.created_at)}{e.actor_role ? ` · ${e.actor_role.toLowerCase()}` : ''}</span>{e.reason && <em>{e.reason}</em>}</li>)}</ul></section>
 
       {active && <button className="btn danger-outline block" onClick={() => setCancel(true)}>{t('Cancel booking', 'बुकिंग रद्द करें')}</button>}
-      {failed && <button className="btn primary block" onClick={() => go(`/browse`)}>{t('Find another provider', 'दूसरा प्रोवाइडर खोजें')}</button>}
+      {failed && <button className="btn primary block" onClick={() => go(`/browse`)}>{t('Find another Dialoo Partner', 'दूसरा Dialoo पार्टनर खोजें')}</button>}
       {b.status === 'COMPLETED' && !b.reviewed && <ReviewForm bookingId={b.id} onDone={load} />}
       {b.status === 'COMPLETED' && b.reviewed ? <p className="ok center"><Star size={15} aria-hidden="true" fill="currentColor" style={{ verticalAlign: '-2px' }} /> {t('Thanks for your review!', 'रिव्यू के लिए धन्यवाद!')}</p> : null}
 
@@ -89,7 +92,7 @@ export default function Tracking({ id }) {
 
 function CancelSheet({ open, onClose, onConfirm }) {
   const t = useT(); const [r, setR] = useState('');
-  const reasons = [t('Changed my mind', 'इरादा बदल गया'), t('Booked by mistake', 'गलती से बुक हुई'), t('Provider is taking too long', 'प्रोवाइडर देर कर रहा है'), t('Found another provider', 'दूसरा प्रोवाइडर मिला')];
+  const reasons = [t('Changed my mind', 'इरादा बदल गया'), t('Booked by mistake', 'गलती से बुक हुई'), t('Dialoo Partner is taking too long', 'Dialoo पार्टनर देर कर रहा है'), t('Found another Dialoo Partner', 'दूसरा Dialoo पार्टनर मिला')];
   return (
     <Sheet open={open} onClose={onClose} title={t('Cancel this booking?', 'यह बुकिंग रद्द करें?')}>
       <div className="chip-row">{reasons.map((x) => <button key={x} className={`chip ${r === x ? 'on' : ''}`} onClick={() => setR(x)}>{x}</button>)}</div>

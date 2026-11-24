@@ -87,7 +87,7 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
           <span className="promo-art" aria-hidden="true"><Wrench size={34} /><Droplets className="promo-art-sm" size={20} /></span>
         </button>
         <button className="promo promo-orange" onClick={() => go('/become-provider')}>
-          <span className="promo-copy"><b>{t('Join Dialoo as a Provider', 'Dialoo से प्रोवाइडर बनें')}</b><em>{t('Get more customers, build your digital dukaan', 'ज़्यादा ग्राहक पाएँ, अपनी डिजिटल दुकान बनाएँ')}</em><span className="promo-cta">{t('Join Now', 'अभी जुड़ें')}<ArrowRight size={16} aria-hidden="true" /></span></span>
+          <span className="promo-copy"><b>{t('Become a Dialoo Partner', 'Dialoo पार्टनर बनें')}</b><em>{t('Earn with Dialoo — get more consumers, build your digital dukaan', 'ज़्यादा कंज़्यूमर पाएँ, अपनी डिजिटल दुकान बनाएँ')}</em><span className="promo-cta">{t('Join Now', 'अभी जुड़ें')}<ArrowRight size={16} aria-hidden="true" /></span></span>
           <span className="promo-art" aria-hidden="true"><HardHat size={36} /></span>
         </button>
       </div>
@@ -154,7 +154,7 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
       {/* G. available right now */}
       <section>
         <div className="sec-head"><h2><Zap className="sec-ico orange" size={20} aria-hidden="true" />{t('Available Right Now', 'अभी उपलब्ध')}</h2><button className="link" onClick={() => go('/browse?available=1&sort=fastest')}>{t('See all', 'सब देखें')}</button></div>
-        {!now ? <Spinner /> : now.length === 0 ? <Empty icon={<Clock size={26} aria-hidden="true" />} title={t('No one is online right now', 'अभी कोई ऑनलाइन नहीं')} text={t('Try browsing all providers and schedule for later.', 'सभी प्रोवाइडर देखें और बाद के लिए शेड्यूल करें।')} /> : (
+        {!now ? <Spinner /> : now.length === 0 ? <Empty icon={<Clock size={26} aria-hidden="true" />} title={t('No one is online right now', 'अभी कोई ऑनलाइन नहीं')} text={t('Try browsing all Dialoo Partners and schedule for later.', 'सभी Dialoo पार्टनर देखें और बाद के लिए शेड्यूल करें।')} /> : (
           <Rail>{now.map((p) => <ProviderCard key={p.id} p={p} compact fav={favs.includes(p.id)} onFav={onFav} onBook={onBook} />)}</Rail>
         )}
       </section>
@@ -162,7 +162,7 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
       {/* H. top rated */}
       <section>
         <div className="sec-head"><h2><Star className="sec-ico orange" size={20} fill="currentColor" aria-hidden="true" />{t('Top Rated Near You', 'आपके पास टॉप रेटेड')}</h2><button className="link" onClick={() => go('/browse?sort=rating')}>{t('See all', 'सब देखें')}</button></div>
-        {!top ? <Spinner /> : top.length === 0 ? <Empty icon={<SearchX size={26} aria-hidden="true" />} title={t('No providers in this city yet', 'इस शहर में अभी कोई प्रोवाइडर नहीं')} text={t('We are onboarding professionals. Are you one?', 'हम प्रोफेशनल जोड़ रहे हैं। क्या आप हैं?')} action={<button className="btn primary" onClick={() => go('/become-provider')}>{t('Become a provider', 'प्रोवाइडर बनें')}</button>} /> : (
+        {!top ? <Spinner /> : top.length === 0 ? <Empty icon={<SearchX size={26} aria-hidden="true" />} title={t('No Dialoo Partners in this city yet', 'इस शहर में अभी कोई Dialoo पार्टनर नहीं')} text={t('We are onboarding professionals. Are you one?', 'हम प्रोफेशनल जोड़ रहे हैं। क्या आप हैं?')} action={<button className="btn primary" onClick={() => go('/become-provider')}>{t('Become a Dialoo Partner', 'Dialoo पार्टनर बनें')}</button>} /> : (
           <div className="top-grid">{top.map((p) => <ProviderCard key={p.id} p={p} fav={favs.includes(p.id)} onFav={onFav} onBook={onBook} />)}</div>
         )}
       </section>
@@ -181,7 +181,7 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
             ) : <Rail>{again.map((p) => <ProviderCard key={p.id} p={p} compact bookLabel={t('Book again', 'फिर से बुक करें')} fav={favs.includes(p.id)} onFav={onFav} onBook={onBook} />)}</Rail>
           ) : (
             favIds.length === 0 ? (
-              <Empty icon={<Heart size={26} aria-hidden="true" />} title={t('No favourites yet', 'अभी कोई पसंदीदा नहीं')} text={t('Tap the heart on any provider to save them here.', 'किसी प्रोवाइडर पर दिल दबाएँ, वे यहाँ सेव होंगे।')} />
+              <Empty icon={<Heart size={26} aria-hidden="true" />} title={t('No favourites yet', 'अभी कोई पसंदीदा नहीं')} text={t('Tap the heart on any Dialoo Partner to save them here.', 'किसी Dialoo पार्टनर पर दिल दबाएँ, वे यहाँ सेव होंगे।')} />
             ) : favLoading && favRows.length === 0 ? <Spinner /> : (
               <Rail>{favRows.map((p) => <ProviderCard key={p.id} p={p} compact fav onFav={onFav} onBook={onBook} />)}</Rail>
             )

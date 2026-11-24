@@ -104,3 +104,16 @@ Customer ka OTP login MSG91 widget se chalta hai: SMS MSG91 bhejta hai, code Dia
 5. Redeploy karke apne number se login try karein.
 
 **Dhyan dein:** ye sirf customer OTP login ko cover karta hai. Admin login 2FA aur Forgot password abhi bhi server-side SMS (`SMS_PROVIDER`) se chalte hain, jiske liye DLT template chahiye.
+
+## Live tracking (Leaflet + OpenStreetMap + OpenRouteService)
+
+1. openrouteservice.org par free account banayein -> **Dashboard -> Request a token** (Standard) -> key copy karein.
+2. Render -> `dialoo-api` -> Environment me `ORS_API_KEY=<key>` daalein. (Na daalein to bhi tracking chalegi, bas ETA seedhi doori se andaza hoga.)
+3. Redeploy. Flyway apne aap `booking_tracking` table bana dega (`V14__live_tracking.sql`).
+4. Test: ek booking Accept karein -> Dialoo Partner "I am on the way" dabaye (location ki permission allow kare) -> consumer ke booking page par map, orange route aur ETA dikhega.
+
+Dhyan dein:
+- Dialoo Partner ka app **khula (foreground)** rehna chahiye, tabhi location jati hai. App minimise/lock hone par updates ruk sakte hain. Background tracking ke liye baad me Capacitor background-geolocation plugin lagana hoga.
+- Consumer ka booking me address-location (GPS) save hona chahiye, tabhi route banta hai. "Use my current location" se booking karne par ye save hota hai.
+- OSM tiles aur ORS free plan sirf kam traffic ke liye hain. ORS ka daily cap `ORS_DAILY_LIMIT` (default 1800) se control hota hai; cap ke baad estimate dikhta hai. Users badhne par apna tile server ya paid plan lein.
+- Location sirf `ON_THE_WAY` ke dauran rehti hai aur status badalte hi delete ho jati hai.

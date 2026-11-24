@@ -40,7 +40,7 @@ export default function Browse({ query, city, favs, onFav, onBook, userPos }) {
       {q && <p className="muted">{t('Results for', 'परिणाम:')} “{q}” <button className="link" onClick={() => go(cat ? `/browse?cat=${cat}` : '/browse')}>{t('clear', 'हटाएँ')}</button></p>}
       {err && <p className="error">{err}</p>}
       {!rows ? <Spinner /> : rows.length === 0 ? (
-        <Empty icon={<SearchX size={26} aria-hidden="true" />} title={t('No providers found', 'कोई प्रोवाइडर नहीं मिला')} text={t('Try removing a filter or searching a nearby category.', 'कोई फ़िल्टर हटाएँ या पास की श्रेणी खोजें।')} />
+        <Empty icon={<SearchX size={26} aria-hidden="true" />} title={t('No Dialoo Partners found', 'कोई Dialoo पार्टनर नहीं मिला')} text={t('Try removing a filter or searching a nearby category.', 'कोई फ़िल्टर हटाएँ या पास की श्रेणी खोजें।')} />
       ) : (
         <>
           <div className="grid">{rows.map((p) => <ProviderCard key={p.id} p={p} fav={favs.includes(p.id)} onFav={onFav} onBook={onBook} />)}</div>

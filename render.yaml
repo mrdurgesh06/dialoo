@@ -49,6 +49,9 @@ services:
         sync: false
       - key: MSG91_AUTH_KEY
         sync: false                    # secret - server-side only (verifies the widget token)
+      # --- Live tracking (Leaflet + OpenStreetMap + OpenRouteService). Free key: openrouteservice.org ---
+      - key: ORS_API_KEY
+        sync: false                    # without it, tracking still works with a straight-line ETA estimate
       # --- demo marketplace data. For production use classpath:db/none ---
       - key: SPRING_FLYWAY_LOCATIONS
         value: classpath:db/migration
@@ -60,7 +63,7 @@ services:
     name: dialoo-web
     runtime: static
     region: singapore
-    buildCommand: cd apps/web && npm ci && npm run build
+    buildCommand: cd apps/web && npm install --no-audit --no-fund && npm run build
     staticPublishPath: ./apps/web/dist
     autoDeploy: true
     buildFilter:

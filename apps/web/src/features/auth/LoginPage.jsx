@@ -145,8 +145,8 @@ export default function LoginPage({lang, setLang, onSuccess: onSuccessRaw, onGue
               <h1>{t.title}</h1>
               <p className="lg-sub">{t.sub}</p>
               <div className="lg-role" role="radiogroup" aria-label={hi ? 'लॉगिन का प्रकार' : 'Login as'}>
-                <button type="button" role="radio" aria-checked={intent === 'customer'} className={intent === 'customer' ? 'on' : ''} onClick={() => pick('customer')}><span><UserRound size={22} aria-hidden="true"/></span><b>{hi ? 'ग्राहक' : 'Customer'}</b><em>{hi ? 'सर्विस बुक करें' : 'Book services'}</em></button>
-                <button type="button" role="radio" aria-checked={intent === 'provider'} className={intent === 'provider' ? 'on' : ''} onClick={() => pick('provider')}><span><HardHat size={22} aria-hidden="true"/></span><b>{hi ? 'प्रोवाइडर' : 'Provider'}</b><em>{hi ? 'काम पाएँ' : 'Get work'}</em></button>
+                <button type="button" role="radio" aria-checked={intent === 'customer'} className={intent === 'customer' ? 'on' : ''} onClick={() => pick('customer')}><span><UserRound size={22} aria-hidden="true"/></span><b>{hi ? 'कंज़्यूमर' : 'Consumer'}</b><em>{hi ? 'सर्विस खोजें और बुक करें' : 'Find & book services'}</em></button>
+                <button type="button" role="radio" aria-checked={intent === 'provider'} className={intent === 'provider' ? 'on' : ''} onClick={() => pick('provider')}><span><HardHat size={22} aria-hidden="true"/></span><b>{hi ? 'Dialoo पार्टनर' : 'Dialoo Partner'}</b><em>{hi ? 'Dialoo के साथ कमाएँ' : 'Earn with Dialoo'}</em></button>
               </div>
 
               <label className="lg-label" htmlFor="lg-mobile">{mode === 'otp' ? t.mobile : 'Mobile number or email address'}</label>

@@ -1,5 +1,10 @@
 # Dialoo — changelog
 
+## Live tracking + role names
+- **Live tracking:** Dialoo Partner app sends GPS every 10 s while a booking is `ON_THE_WAY` (`POST /bookings/{id}/location`); the consumer's booking page shows a Leaflet/OpenStreetMap map, orange route and ETA badge (`GET /bookings/{id}/tracking`, polled every 6 s). Routes/ETA from OpenRouteService (`ORS_API_KEY`), cached per booking (45 s), daily cap, straight-line fallback. New table `booking_tracking` (latest position only, deleted when the booking leaves `ON_THE_WAY`). New: `TrackingService`, `TrackingController`, `V14__live_tracking.sql`, `shared/TrackMap.jsx`, `shared/useShareLocation.js`, `features/customer/LiveTrack.jsx`.
+- **Naming (consumer/partner apps):** Customer -> **Consumer** ("Find & book services"), Provider -> **Dialoo Partner** ("Earn with Dialoo"). Admin console labels unchanged.
+- `package.json`/lock: added `leaflet@1.9.4`; Render web build uses `npm install`.
+
 ## MSG91 real OTP login
 - Customer OTP login via the **MSG91 OTP Widget** (headless, Dialoo's own 6-digit boxes). New `GET /auth/otp/config` and `POST /auth/otp/widget-verify`; the server re-verifies the widget JWT with the Authkey (`Msg91WidgetVerifier`) and logs in the mobile number MSG91 verified (single-use tokens). Enabled when `MSG91_WIDGET_ID`, `MSG91_TOKEN_AUTH`, `MSG91_AUTH_KEY` are set; otherwise the old local flow is unchanged. In widget mode the local `/otp/request` and `/otp/verify` are disabled.
 - Optional `Msg91SmsSender` (`SMS_PROVIDER=msg91`, needs `MSG91_TEMPLATE_ID` from a DLT template) for server-side SMS (admin 2FA, forgot password). `SmsSender` gained `sendOtp(...)`; Twilio/log senders unchanged.

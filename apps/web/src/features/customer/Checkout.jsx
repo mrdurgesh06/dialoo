@@ -56,7 +56,7 @@ export default function Checkout({ target, user, loc, onLocate, onClose, onDone 
         couponCode: bill?.couponApplied ? code.trim().toUpperCase() : null, contactName: name, contactPhone: phone,
         latitude: coords?.lat ?? null, longitude: coords?.lng ?? null,
       });
-      haptic('medium'); toast(t('Booking placed! Waiting for the provider to accept.', 'बुकिंग हो गई! प्रोवाइडर के स्वीकार करने का इंतज़ार।'), 'ok');
+      haptic('medium'); toast(t('Booking placed! Waiting for the Dialoo Partner to accept.', 'बुकिंग हो गई! Dialoo पार्टनर के स्वीकार करने का इंतज़ार।'), 'ok');
       onDone?.(); onClose(); go(`/booking/${b.id}`);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -88,7 +88,7 @@ export default function Checkout({ target, user, loc, onLocate, onClose, onDone 
         <div className="seg"><button type="button" className={when === 'NOW' ? 'on' : ''} onClick={() => setWhen('NOW')}><Zap size={15} aria-hidden="true" />{t('Now', 'अभी')}</button><button type="button" className={when === 'LATER' ? 'on' : ''} onClick={() => setWhen('LATER')}><CalendarClock size={15} aria-hidden="true" />{t('Schedule', 'शेड्यूल')}</button></div>
         {when === 'LATER' && <input type="datetime-local" value={slot} min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)} onChange={(e) => setSlot(e.target.value)} />}
       </div>
-      <div className="field"><label>{t('Notes for provider (optional)', 'प्रोवाइडर के लिए नोट (वैकल्पिक)')}</label><textarea rows="2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('Describe the problem', 'समस्या बताएँ')} /></div>
+      <div className="field"><label>{t('Notes for Dialoo Partner (optional)', 'Dialoo पार्टनर के लिए नोट (वैकल्पिक)')}</label><textarea rows="2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('Describe the problem', 'समस्या बताएँ')} /></div>
 
       <div className="field"><label>{t('Coupon', 'कूपन')}</label>
         <div className="coupon-box"><input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WELCOME50" maxLength={30} /></div>
@@ -103,7 +103,7 @@ export default function Checkout({ target, user, loc, onLocate, onClose, onDone 
           <div><span>{t('Taxes', 'टैक्स')}</span><span>{money(bill.taxAmount)}</span></div>
           {Number(bill.discount) > 0 && <div className="save"><span>{t('Coupon discount', 'कूपन छूट')}</span><span>− {money(bill.discount)}</span></div>}
           <div className="total"><span>{t('To pay after service', 'सर्विस के बाद देय')}</span><span>{money(bill.total)}</span></div>
-          <p className="muted small">{t('Final amount may change if extra work or material is needed — agree with the provider first.', 'अतिरिक्त काम/सामान होने पर अंतिम राशि बदल सकती है — पहले प्रोवाइडर से सहमति लें।')}</p>
+          <p className="muted small">{t('Final amount may change if extra work or material is needed — agree with the Dialoo Partner first.', 'अतिरिक्त काम/सामान होने पर अंतिम राशि बदल सकती है — पहले Dialoo पार्टनर से सहमति लें।')}</p>
         </div>
       )}
       {err && <p className="error" role="alert">{err}</p>}

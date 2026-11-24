@@ -77,7 +77,7 @@ export function Profile({ user, favs, onFav, onBook, onLogout, onNeedLogin, lang
       <section className="card profile-head"><div className="avatar xl">{(user.full_name || 'U')[0].toUpperCase()}</div><div><h2>{user.full_name}</h2><p className="muted">{user.phone}{user.email ? ` · ${user.email}` : ''}</p></div></section>
       <div className="menu">
         <button onClick={() => go('/bookings')}><ClipboardList size={20} aria-hidden="true" />{t('My bookings', 'मेरी बुकिंग')}<i><ChevronRight size={18} aria-hidden="true" /></i></button>
-        <button onClick={() => go(isProvider ? '/pro' : '/become-provider')}><HardHat size={20} aria-hidden="true" />{isProvider ? t('Provider dashboard', 'प्रोवाइडर डैशबोर्ड') : t('Become a provider', 'प्रोवाइडर बनें')}<i><ChevronRight size={18} aria-hidden="true" /></i></button>
+        <button onClick={() => go(isProvider ? '/pro' : '/become-provider')}><HardHat size={20} aria-hidden="true" />{isProvider ? t('Dialoo Partner dashboard', 'Dialoo पार्टनर डैशबोर्ड') : t('Become a Dialoo Partner', 'Dialoo पार्टनर बनें')}<i><ChevronRight size={18} aria-hidden="true" /></i></button>
         <button onClick={() => go('/rentals')}><Tractor size={20} aria-hidden="true" />{t('Equipment rentals', 'उपकरण किराये')}<i><ChevronRight size={18} aria-hidden="true" /></i></button>
         <button onClick={() => go('/projects')}><Construction size={20} aria-hidden="true" />{t('Projects', 'प्रोजेक्ट')}<i><ChevronRight size={18} aria-hidden="true" /></i></button>
         <button onClick={() => go('/emergency')}><Siren size={20} aria-hidden="true" />{t('Emergency help', 'इमरजेंसी मदद')}<i><ChevronRight size={18} aria-hidden="true" /></i></button>
@@ -86,7 +86,7 @@ export function Profile({ user, favs, onFav, onBook, onLogout, onNeedLogin, lang
       <section className="card"><h3>{t('Saved addresses', 'सेव किए पते')}</h3>
         {addrs.map((x) => <div className="svc-row" key={x.id}><div><b>{x.label}</b> <span className="muted">{x.address_line}</span></div><button className="link danger" onClick={() => customerApi.deleteAddress(x.id).then(loadAddr)}>{t('Remove', 'हटाएँ')}</button></div>)}
         <div className="row gap wrap"><select value={a.label} onChange={(e) => setA({ ...a, label: e.target.value })}>{['HOME', 'OFFICE', 'FARM', 'SHOP', 'OTHER'].map((x) => <option key={x}>{x}</option>)}</select><input className="grow" value={a.addressLine} onChange={(e) => setA({ ...a, addressLine: e.target.value })} placeholder={t('Full address', 'पूरा पता')} /><button className="btn outline sm" disabled={a.addressLine.length < 5} onClick={addAddr}>{t('Save', 'सेव')}</button></div></section>
-      <section><h3>{t('Favourites', 'पसंदीदा')}</h3>{favRows.length === 0 ? <p className="muted">{t('Tap the heart on any provider to save them here.', 'किसी प्रोवाइडर पर दिल का निशान दबाएँ।')}</p> : <div className="grid">{favRows.map((p) => <ProviderCard key={p.id} p={p} compact fav onFav={onFav} onBook={onBook} />)}</div>}</section>
+      <section><h3>{t('Favourites', 'पसंदीदा')}</h3>{favRows.length === 0 ? <p className="muted">{t('Tap the heart on any Dialoo Partner to save them here.', 'किसी Dialoo पार्टनर पर दिल का निशान दबाएँ।')}</p> : <div className="grid">{favRows.map((p) => <ProviderCard key={p.id} p={p} compact fav onFav={onFav} onBook={onBook} />)}</div>}</section>
       <button className="btn danger-outline block" onClick={onLogout}>{t('Log out', 'लॉग आउट')}</button>
     </div>
   );

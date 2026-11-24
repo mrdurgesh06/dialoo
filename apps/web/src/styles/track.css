@@ -1,0 +1,15 @@
+/* Live tracking (Leaflet map + bottom card) */
+.trk-card{background:var(--panel);border-radius:18px;overflow:hidden;box-shadow:var(--shadow);margin:12px 0;border:1px solid var(--line)}
+.trk-map{position:relative;z-index:0;isolation:isolate;height:min(46vh,340px);min-height:240px;background:#e8edf5}
+.trk-map .leaflet-control-attribution{font-size:10px}
+.trk-pin span{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#fff;border:3px solid var(--orange);font-size:21px;box-shadow:0 2px 8px rgba(16,24,40,.28)}
+.trk-pin.home span{border-color:#1f2937;background:#1f2937;filter:none}
+.trk-info{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px}
+.trk-info h3{font-size:18px;margin-bottom:2px}.trk-info p{color:var(--muted);font-size:13.5px}
+.trk-eta{flex:none;min-width:74px;text-align:center;color:#fff;border-radius:16px;padding:10px 12px;background:linear-gradient(180deg,#22b573,#128a55);line-height:1.1}
+.trk-eta b{display:block;font-size:26px}.trk-eta small{font-size:12px;opacity:.95}
+.trk-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px 14px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.trk-warn{background:var(--orange-soft);color:#9a4a07;padding:8px 14px;font-size:13px;font-weight:600}
+.share-banner{display:flex;gap:10px;align-items:center;border-radius:14px;padding:12px 14px;margin:0 0 12px;font-size:13.5px;font-weight:600}
+.share-banner.live{background:#e8f8ef;color:#0b6b3a}.share-banner.error,.share-banner.denied{background:#fdecea;color:#a3271b}
+.share-banner .dot{width:10px;height:10px;border-radius:50%;background:currentColor;animation:pulse 1.4s infinite;flex:none}

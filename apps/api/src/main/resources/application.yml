@@ -59,6 +59,12 @@ app:
     nominatim-url: ${GEO_NOMINATIM_URL:https://nominatim.openstreetmap.org}
     user-agent: ${GEO_USER_AGENT:Dialoo/4.0 (set GEO_USER_AGENT with your contact email)}
 
+  tracking:
+    # Live tracking route + ETA. Free key: https://openrouteservice.org (set ORS_API_KEY; without it a straight-line estimate is used)
+    ors-api-key: ${ORS_API_KEY:}
+    ors-daily-limit: ${ORS_DAILY_LIMIT:1800}
+    fallback-speed-kmh: ${TRACKING_FALLBACK_SPEED_KMH:25}
+
   sms:
     provider: ${SMS_PROVIDER:log}   # log | twilio | msg91
     msg91:
