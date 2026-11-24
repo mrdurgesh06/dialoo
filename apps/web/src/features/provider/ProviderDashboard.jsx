@@ -4,6 +4,7 @@ import { go } from '../../shared/router.js';
 import { Empty, Sheet, Spinner, StatusBadge, dateTime, money, timeAgo, useT, useToast, usePolling } from '../../shared/ui.jsx';
 import { ChatSheet } from '../customer/Tracking.jsx';
 import { useShareLocation } from '../../shared/useShareLocation.js';
+import JobSteps from './JobSteps.jsx';
 import { Ban, Banknote, CalendarClock, CarFront, CircleCheck, HardHat, Hourglass, Inbox, LockKeyhole, MapPin, MessageCircle, PartyPopper, Phone, Play, Star, Zap } from 'lucide-react';
 
 export function BecomeProvider({ user, onNeedLogin, onLocate }) {
@@ -93,6 +94,7 @@ export default function ProviderDashboard({ user, onNeedLogin }) {
           <p><b>{r.customer_name}</b> · {r.service_address}</p>
           {r.description && <p className="muted">“{r.description}”</p>}
           <p className="muted small">{r.scheduled_at ? <><CalendarClock size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {dateTime(r.scheduled_at)}</> : <><Zap size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('ASAP', 'तुरंत')}</>} · {timeAgo(r.created_at)}</p>
+          <JobSteps status={r.status} paid={r.payment_status === 'PAID'} />
           <div className="row gap wrap">
             {r.status === 'REQUESTED' && <><button className="btn primary sm" onClick={() => setStatus(r.id, { status: 'ACCEPTED' }, t('Booking accepted', 'बुकिंग स्वीकार'))}>{t('Accept', 'स्वीकार')}</button><button className="btn danger-outline sm" onClick={() => setRejectFor(r)}>{t('Reject', 'अस्वीकार')}</button></>}
             {r.status === 'ACCEPTED' && <button className="btn primary sm" onClick={() => setStatus(r.id, { status: 'ON_THE_WAY' }, t('Marked on the way', 'रास्ते में'))}><CarFront size={16} aria-hidden="true" />{t('I am on the way', 'मैं निकल गया')}</button>}
@@ -100,8 +102,10 @@ export default function ProviderDashboard({ user, onNeedLogin }) {
             {r.status === 'IN_PROGRESS' && <button className="btn primary sm" onClick={() => setDoneFor(r)}><CircleCheck size={16} aria-hidden="true" />{t('Complete job', 'काम पूरा करें')}</button>}
             {r.status === 'COMPLETED' && r.payment_status !== 'PAID' && <button className="btn outline sm" onClick={() => act(() => providerApi.paymentReceived(r.id), t('Payment recorded', 'भुगतान दर्ज'))}><Banknote size={16} aria-hidden="true" />{t('Mark paid', 'भुगतान मिला')}</button>}
             {r.status === 'COMPLETED' && r.payment_status === 'PAID' && <span className="ok"><Banknote size={16} aria-hidden="true" style={{ verticalAlign: '-3px' }} /> {t('Paid', 'भुगतान मिला')}</span>}
+          </div>
+          <div className="row gap wrap job-more">
             {['ACCEPTED', 'ON_THE_WAY'].includes(r.status) && <button className="btn danger-outline sm" onClick={() => setRejectFor({ ...r, cancel: true })}>{t('Cancel', 'रद्द')}</button>}
-            {['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(r.status) && r.contact_phone && <a className="btn outline sm" href={`tel:${r.contact_phone}`}><Phone size={16} aria-hidden="true" />{t('Call consumer', 'कस्टमर को कॉल')}</a>}
+            {['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(r.status) && r.contact_phone && <a className="btn outline sm" href={`tel:${r.contact_phone}`}><Phone size={16} aria-hidden="true" />{t('Call consumer', 'कंज़्यूमर को कॉल')}</a>}
             {!['REJECTED', 'EXPIRED', 'CANCELLED'].includes(r.status) && <button className="btn ghost sm" aria-label={t('Chat', 'चैट')} onClick={() => setChatFor(r.id)}><MessageCircle size={16} aria-hidden="true" /></button>}
           </div>
         </article>
@@ -112,7 +116,7 @@ export default function ProviderDashboard({ user, onNeedLogin }) {
         <div className="plans">{plans.map((p) => <div key={p.id} className="plan"><b>{p.name}</b><span>{Number(p.price) ? `₹${Number(p.price)}/mo` : 'Free'}</span><small>{p.features}</small>
           <button className="btn outline sm" onClick={() => act(async () => { const r = await providerApi.choosePlan(p.id); if (r.message) toast(r.message, 'info'); providerApi.subscription().then(setSub); }, t('Request sent', 'अनुरोध भेजा'))}>{Number(p.price) ? t('Upgrade', 'अपग्रेड') : t('Select', 'चुनें')}</button></div>)}</div></section>
 
-      <Sheet open={!!startFor} onClose={() => setStartFor(null)} title={t('Enter consumer start code', 'कस्टमर का स्टार्ट कोड डालें')}><CodeForm onSubmit={(code) => { setStatus(startFor.id, { status: 'IN_PROGRESS', startCode: code }, t('Work started', 'काम शुरू')); setStartFor(null); }} /></Sheet>
+      <Sheet open={!!startFor} onClose={() => setStartFor(null)} title={t('Enter consumer start code', 'कंज़्यूमर का स्टार्ट कोड डालें')}><p className="start-hint">{t('Ask the consumer for the 4-digit code shown in their Dialoo booking page. This confirms you have reached the right place.', 'कंज़्यूमर से 4 अंकों का कोड माँगें जो उनके Dialoo बुकिंग पेज पर दिखता है। इससे पक्का होता है कि आप सही जगह पहुँचे हैं।')}</p><CodeForm onSubmit={(code) => { setStatus(startFor.id, { status: 'IN_PROGRESS', startCode: code }, t('Work started', 'काम शुरू')); setStartFor(null); }} /></Sheet>
       <Sheet open={!!doneFor} onClose={() => setDoneFor(null)} title={t('Complete job', 'काम पूरा करें')}><AmountForm initial={doneFor?.total_amount} onSubmit={(amt) => { setStatus(doneFor.id, { status: 'COMPLETED', finalAmount: amt }, t('Job completed', 'काम पूरा')); setDoneFor(null); }} /></Sheet>
       <Sheet open={!!rejectFor} onClose={() => setRejectFor(null)} title={rejectFor?.cancel ? t('Cancel this job', 'यह काम रद्द करें') : t('Reject request', 'रिक्वेस्ट अस्वीकार')}><ReasonForm onSubmit={(reason) => { setStatus(rejectFor.id, { status: rejectFor.cancel ? 'CANCELLED' : 'REJECTED', reason }, t('Done', 'हो गया')); setRejectFor(null); }} /></Sheet>
       {chatFor && <ChatSheet open onClose={() => setChatFor(null)} bookingId={chatFor} />}
