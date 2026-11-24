@@ -45,6 +45,11 @@ app:
     max-attempts: 5
     max-requests-per-ip-10-min: 20
     dev-mode: ${OTP_DEV_MODE:false}
+    # MSG91 OTP Widget login (no DLT template needed on our side). All three must be set to enable it.
+    msg91:
+      widget-id: ${MSG91_WIDGET_ID:}
+      token-auth: ${MSG91_TOKEN_AUTH:}
+      auth-key: ${MSG91_AUTH_KEY:}
   cors:
     # Comma-separated list of allowed browser origins
     allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}

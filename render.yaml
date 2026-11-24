@@ -41,13 +41,14 @@ services:
       - key: OTP_DEV_MODE
         value: "false"
       - key: SMS_PROVIDER
-        value: msg91                   # log = no real SMS | msg91 | twilio
+        value: log                     # log = no server SMS (admin/forgot-password OTP need a sender) | msg91 (needs DLT template) | twilio
+      # --- MSG91 OTP Widget login (customer OTP login). All three must be set to enable it. ---
+      - key: MSG91_WIDGET_ID
+        sync: false
+      - key: MSG91_TOKEN_AUTH
+        sync: false
       - key: MSG91_AUTH_KEY
-        sync: false                    # MSG91 dashboard -> Authkey
-      - key: MSG91_TEMPLATE_ID
-        sync: false                    # DLT-approved OTP template id (template text must contain ##OTP##)
-      - key: MSG91_COUNTRY_CODE
-        value: "91"
+        sync: false                    # secret - server-side only (verifies the widget token)
       # --- demo marketplace data. For production use classpath:db/none ---
       - key: SPRING_FLYWAY_LOCATIONS
         value: classpath:db/migration
