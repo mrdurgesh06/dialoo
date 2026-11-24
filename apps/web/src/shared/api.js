@@ -81,13 +81,32 @@ export async function api(path, { method = 'GET', body, auth = true, admin = fal
 
 const qs = (p = {}) => { const u = new URLSearchParams(); Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') u.set(k, v); }); const s = u.toString(); return s ? `?${s}` : ''; };
 
+// OTP login runs either through our own SMS sender ("local") or the MSG91 OTP widget; the server decides.
+let otpCfg = null;
+async function otpConfig() {
+  if (otpCfg) return otpCfg;
+  try { otpCfg = await api('/auth/otp/config', { auth: false }); } catch { return { mode: 'local' }; }
+  return otpCfg;
+}
+
+export { otpConfig as getOtpConfig };
+
 export const authApi = {
   register: (body) => api('/auth/register', { method: 'POST', body, auth: false }),
   login: async (body) => { const r = await api('/auth/login', { method: 'POST', body, auth: false }); clearAuthCache(); setSession(r); return r; },
-  requestOtp: (mobile) => api('/auth/otp/request', { method: 'POST', body: { mobile }, auth: false }),
+  requestOtp: async (mobile) => {
+    const cfg = await otpConfig();
+    if (cfg.mode === 'msg91-widget') { const { msg91Send } = await import('./msg91.js'); await msg91Send(cfg, mobile); return { message: 'OTP sent', expiresInSeconds: 300, resendInSeconds: 30 }; }
+    return api('/auth/otp/request', { method: 'POST', body: { mobile }, auth: false });
+  },
   requestPasswordReset: (mobile) => api('/auth/password/forgot/request', { method: 'POST', body: { mobile }, auth: false }),
   resetPassword: (mobile, otp, newPassword) => api('/auth/password/forgot/reset', { method: 'POST', body: { mobile, otp, newPassword }, auth: false }),
-  verifyOtp: async (mobile, otp) => { const r = await api('/auth/otp/verify', { method: 'POST', body: { mobile, otp }, auth: false }); clearAuthCache(); setSession(r); return r; },
+  verifyOtp: async (mobile, otp) => {
+    const cfg = await otpConfig(); let r;
+    if (cfg.mode === 'msg91-widget') { const { msg91Verify } = await import('./msg91.js'); const accessToken = await msg91Verify(cfg, otp); r = await api('/auth/otp/widget-verify', { method: 'POST', body: { accessToken }, auth: false }); }
+    else r = await api('/auth/otp/verify', { method: 'POST', body: { mobile, otp }, auth: false });
+    clearAuthCache(); setSession(r); return r;
+  },
   me: () => api('/auth/me'),
   updateMe: (body) => api('/auth/me', { method: 'PATCH', body }),
   logout: async () => { const rt = getRefreshToken(); try { await api('/auth/logout', { method: 'POST', body: { refreshToken: rt }, auth: false }); } catch { /* ignore */ } setSession(null); clearAuthCache(); },
@@ -153,6 +172,7 @@ export const providerApi = {
 const A = (path, opts = {}) => api(`/admin${path}`, { ...opts, admin: true });
 export const adminApi = {
   login: (identifier, password) => api('/admin/auth/login', { method: 'POST', body: { identifier, password }, auth: false }),
+  verifyWidget: (mfaToken, accessToken) => api('/admin/auth/verify-widget', { method: 'POST', body: { mfaToken, accessToken }, auth: false }),
   verify: (mfaToken, otp) => api('/admin/auth/verify', { method: 'POST', body: { mfaToken, otp }, auth: false }),
   forgot: (identifier) => api('/admin/auth/forgot', { method: 'POST', body: { identifier }, auth: false }),
   resetPassword: (resetToken, otp, newPassword) => api('/admin/auth/reset', { method: 'POST', body: { resetToken, otp, newPassword }, auth: false }),

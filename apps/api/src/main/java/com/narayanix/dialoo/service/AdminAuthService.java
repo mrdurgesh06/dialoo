@@ -17,11 +17,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class AdminAuthService {
   private static final String GENERIC = "Invalid credentials.";
-  private final JdbcTemplate db; private final PasswordEncoder encoder; private final JwtService jwt; private final OtpService otp;
+  private final JdbcTemplate db; private final PasswordEncoder encoder; private final JwtService jwt; private final OtpService otp; private final Msg91WidgetVerifier widget;
   private final SettingsService settings; private final AuditService audit; private final SecureRandom random = new SecureRandom();
 
-  public AdminAuthService(JdbcTemplate db, PasswordEncoder encoder, JwtService jwt, OtpService otp, SettingsService settings, AuditService audit) {
-    this.db = db; this.encoder = encoder; this.jwt = jwt; this.otp = otp; this.settings = settings; this.audit = audit;
+  public AdminAuthService(JdbcTemplate db, PasswordEncoder encoder, JwtService jwt, OtpService otp, SettingsService settings, AuditService audit, Msg91WidgetVerifier widget) {
+    this.widget = widget; this.db = db; this.encoder = encoder; this.jwt = jwt; this.otp = otp; this.settings = settings; this.audit = audit;
   }
 
   public Map<String, Object> login(String identifier, String password, String ip, String ua) {
@@ -50,6 +50,16 @@ public class AdminAuthService {
     String phone = (String) u.get("phone");
     Map<String, Object> out = new HashMap<>();
     if (settings.flag("ADMIN_2FA_REQUIRED", true)) {
+      if (widget.enabled()) {
+        // MSG91 widget mode: the browser sends/verifies the OTP; the server only checks the resulting token (verifyWidget).
+        out.put("mfaRequired", true);
+        out.put("mfaToken", jwt.createMfaChallenge(phone, 300));
+        out.put("maskedPhone", "******" + phone.substring(Math.max(0, phone.length() - 4)));
+        out.put("otpMode", "msg91-widget");
+        out.put("mobile", OtpService.normalize(phone));
+        out.put("expiresInSeconds", 300); out.put("resendInSeconds", 30);
+        return out;
+      }
       var issued = otp.request(phone, ip, "ADMIN_2FA");
       out.put("mfaRequired", true);
       out.put("mfaToken", jwt.createMfaChallenge(phone, 300));
@@ -71,6 +81,23 @@ public class AdminAuthService {
     String phone = c.getSubject();
     try { otp.verify(phone, code, "ADMIN_2FA"); }
     catch (IllegalArgumentException e) { attempt(phone, ip, false, "BAD_OTP"); throw e; }
+    return completeMfa(phone, ip, ua);
+  }
+
+  /** Admin 2FA through the MSG91 widget: the verified number inside the token must equal the number on the password-verified challenge. */
+  public Map<String, Object> verifyWidget(String mfaToken, String accessToken, String ip, String ua) {
+    Claims c;
+    try { c = jwt.parse(mfaToken); } catch (Exception e) { throw new IllegalArgumentException("Sign-in step expired. Please start again."); }
+    if (!"mfa".equals(c.get("typ"))) throw new IllegalArgumentException("Sign-in step expired. Please start again.");
+    String phone = c.getSubject();
+    String verified;
+    try { verified = widget.verify(accessToken); }
+    catch (IllegalArgumentException e) { attempt(phone, ip, false, "BAD_OTP"); throw e; }
+    if (!verified.equals(OtpService.normalize(phone))) { attempt(phone, ip, false, "OTP_NUMBER_MISMATCH"); throw new IllegalArgumentException("Invalid or expired code."); }
+    return completeMfa(phone, ip, ua);
+  }
+
+  private Map<String, Object> completeMfa(String phone, String ip, String ua) {
     List<Map<String, Object>> rows = db.queryForList("SELECT id,role,enabled,must_change_password FROM users WHERE phone=? AND role IN ('ADMIN','SUPER_ADMIN','SUPPORT')", phone);
     if (rows.isEmpty() || !Boolean.TRUE.equals(rows.get(0).get("enabled"))) throw new IllegalArgumentException(GENERIC);
     Map<String, Object> u = rows.get(0);

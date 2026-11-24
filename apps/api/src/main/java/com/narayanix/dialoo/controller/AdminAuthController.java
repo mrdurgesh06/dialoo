@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.Map;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,8 @@ public class AdminAuthController {
   public record ChangeInitial(@NotBlank String changeToken, @NotBlank String newPassword) {}
   public record Verify(@NotBlank String mfaToken, @NotBlank @Pattern(regexp = "[0-9]{6}") String otp) {}
 
+  public record VerifyWidget(@NotBlank String mfaToken, @NotBlank @Size(max = 4000) String accessToken) {}
+
   private final AdminAuthService auth; private final CurrentUser me; private final com.narayanix.dialoo.service.JwtService jwt;
   public AdminAuthController(AdminAuthService auth, CurrentUser me, com.narayanix.dialoo.service.JwtService jwt) { this.auth = auth; this.me = me; this.jwt = jwt; }
 
@@ -27,6 +30,9 @@ public class AdminAuthController {
   }
   @PostMapping("/verify") public Map<String, Object> verify(@Valid @RequestBody Verify v, HttpServletRequest req) {
     return auth.verifyOtp(v.mfaToken(), v.otp(), req.getRemoteAddr(), req.getHeader("User-Agent"));
+  }
+  @PostMapping("/verify-widget") public Map<String, Object> verifyWidget(@Valid @RequestBody VerifyWidget v, HttpServletRequest req) {
+    return auth.verifyWidget(v.mfaToken(), v.accessToken(), req.getRemoteAddr(), req.getHeader("User-Agent"));
   }
   @PostMapping("/forgot") public Map<String, Object> forgot(@Valid @RequestBody Forgot f, HttpServletRequest req) { return auth.forgot(f.identifier(), req.getRemoteAddr()); }
   @PostMapping("/reset") public Map<String, Object> reset(@Valid @RequestBody Reset r, HttpServletRequest req) { return auth.reset(r.resetToken(), r.otp(), r.newPassword(), req.getRemoteAddr()); }
