@@ -1,0 +1,38 @@
+/* Dialoo design tokens (single source of truth). Loaded after global.css so these override the older values.
+   Palette, radius, spacing (8px system), type scale and motion used by the whole customer experience. */
+:root{
+  /* brand */
+  --blue:#155DFC;--blue2:#0F4FD6;--blue-soft:#EAF1FF;--blue-line:#C9DAFF;
+  --navy:#101B50;--navy-2:#24358C;--nav-active:#3455EB;
+  --orange:#F97316;--orange-soft:#FFF1E6;--orange-line:#FBD5B0;
+  --green:#16A34A;--green-soft:#EAF8EF;--red:#DC2626;--red-soft:#FEF2F2;--red-line:#FECACA;
+  /* surfaces + text */
+  --bg:#F5F7FB;--panel:#FFFFFF;--ink:#101828;--muted:#64748B;--line:#E2E8F0;
+  /* shape + elevation */
+  --radius:14px;--radius-lg:16px;--radius-sm:12px;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 2px 8px rgba(16,24,40,.05);
+  --shadow-hover:0 10px 24px rgba(21,93,252,.12);
+  /* spacing scale (8px system) */
+  --s1:8px;--s2:16px;--s3:24px;--s4:32px;
+  /* type scale */
+  --fs-h1:26px;--fs-h2:20px;--fs-body:14px;--fs-small:12.5px;
+  /* layout */
+  --sidebar-w:240px;--sidebar-w-collapsed:72px;--ease:cubic-bezier(.4,0,.2,1);--dur:.22s;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Devanagari",sans-serif;
+}
+body{font-size:var(--fs-body);color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+.page-title{font-size:var(--fs-h1);font-weight:700;letter-spacing:-.01em}
+.sr-only{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+/* shared controls pick up the new palette */
+.btn{border-radius:var(--radius-sm);transition:background .15s var(--ease),border-color .15s var(--ease),transform .12s var(--ease),box-shadow .15s var(--ease)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.99)}
+.btn.primary{box-shadow:0 1px 2px rgba(21,93,252,.25)}
+.card,.pcard{border-color:var(--line)}
+:focus-visible{outline:3px solid #9DBBFF;outline-offset:2px}
+
+/* skeleton loaders (replace the old spinner rows) */
+.skeleton-stack{display:grid;gap:12px;padding:6px 0;width:100%}
+.skel{display:block;border-radius:var(--radius-sm);background:linear-gradient(90deg,#E9EEF6 25%,#F5F8FC 37%,#E9EEF6 63%);background-size:400% 100%;animation:skel 1.3s ease infinite}
+.skel.card-ph{height:84px;border-radius:var(--radius)}.skel.line{height:12px;border-radius:6px;width:60%}
+@keyframes skel{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}

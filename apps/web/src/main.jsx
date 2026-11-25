@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles/global.css';
+import './styles/tokens.css';
 import CustomerApp from './features/customer/CustomerApp.jsx';
 import AdminApp from './features/admin/AdminApp.jsx';
 import { App as CapApp } from '@capacitor/app';

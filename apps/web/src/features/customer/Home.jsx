@@ -10,6 +10,12 @@ import { Empty, Spinner, useT, useToast } from '../../shared/ui.jsx';
 import { ProviderCard } from '../../shared/parts.jsx';
 import './home.css';
 
+/** Existing service illustration (public/service-icons) with an icon fallback if the file is missing. */
+function HeroArt({ src, fallback }) {
+  const [bad, setBad] = useState(false);
+  return bad ? fallback : <img src={src} alt="" width="256" height="256" decoding="async" draggable="false" onError={() => setBad(true)} />;
+}
+
 /** Horizontal scroller: swipe on touch, arrow buttons on desktop. */
 function Rail({ children }) {
   const t = useT(); const ref = useRef(null);
@@ -76,6 +82,12 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
   const bookPlumber = () => { const c = cats?.find((x) => /plumb/i.test(x.slug || x.name || '')); go(c ? `/browse?cat=${c.slug}` : `/browse?q=${encodeURIComponent('plumber')}`); };
   // the two hero promotions above replace their admin-managed twins; any other admin banner still shows below
   const extraBanners = banners.filter((b) => !/plumb/i.test(b.target_category_slug || '') && !(b.cta_label && /join/i.test(b.cta_label)));
+  // conditions come straight from the coupon API fields (nothing is invented)
+  const couponTerms = (c) => [
+    Number(c.min_order) > 0 && `${t('Min order', 'न्यूनतम ऑर्डर')} ₹${Number(c.min_order)}`,
+    c.discount_type === 'PERCENT' && Number(c.max_discount) > 0 && `${t('Up to', 'अधिकतम')} ₹${Number(c.max_discount)}`,
+    c.first_booking_only && t('First booking only', 'सिर्फ़ पहली बुकिंग'),
+  ].filter(Boolean).join(' · ');
   const promoIcon = (b) => (b.target_category_slug ? <CategoryIcon slug={b.target_category_slug} size={22} /> : b.coupon_code ? <TicketPercent size={22} aria-hidden="true" /> : <Megaphone size={22} aria-hidden="true" />);
 
   return (
@@ -83,22 +95,22 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
       {/* A. hero promotions */}
       <div className="hero-grid">
         <button className="promo promo-blue" onClick={bookPlumber}>
-          <span className="promo-copy"><b>{t('Plumber at your door, fast', 'प्लंबर आपके दरवाज़े पर, तुरंत')}</b><em>{t('Leakage fixed today', 'लीकेज आज ही ठीक')}</em><span className="promo-cta">{t('Book Plumber', 'प्लंबर बुक करें')}<ArrowRight size={16} aria-hidden="true" /></span></span>
-          <span className="promo-art" aria-hidden="true"><Wrench size={34} /><Droplets className="promo-art-sm" size={20} /></span>
+          <span className="promo-copy"><b>{t('Plumber at your door, fast', 'प्लंबर आपके दरवाज़े पर, तुरंत')}</b><em>{t('Leakage fixed today', 'लीकेज आज ही ठीक')}<i aria-hidden="true">•</i>{t('Verified', 'वेरिफाइड')}<i aria-hidden="true">•</i>{t('Trusted', 'भरोसेमंद')}</em><span className="promo-cta">{t('Book Plumber', 'प्लंबर बुक करें')}<ArrowRight size={16} aria-hidden="true" /></span></span>
+          <span className="promo-art" aria-hidden="true"><HeroArt src="/service-icons/plumber.webp" fallback={<Wrench size={44} />} /></span>
         </button>
         <button className="promo promo-orange" onClick={() => go('/become-provider')}>
           <span className="promo-copy"><b>{t('Become a Dialoo Partner', 'Dialoo पार्टनर बनें')}</b><em>{t('Earn with Dialoo — get more consumers, build your digital dukaan', 'ज़्यादा कंज़्यूमर पाएँ, अपनी डिजिटल दुकान बनाएँ')}</em><span className="promo-cta">{t('Join Now', 'अभी जुड़ें')}<ArrowRight size={16} aria-hidden="true" /></span></span>
-          <span className="promo-art" aria-hidden="true"><HardHat size={36} /></span>
+          <span className="promo-art" aria-hidden="true"><HeroArt src="/service-icons/local-shops.webp" fallback={<HardHat size={44} />} /></span>
         </button>
       </div>
 
       {extraBanners.length > 0 && (
-        <div className="promo-rail" ref={bannerRail}>
+        <div className="quick-grid" ref={bannerRail}>
           {extraBanners.map((b) => (
-            <button key={b.id} className="mini-promo" onClick={() => bannerClick(b)}>
-              <span className="mini-ico">{promoIcon(b)}</span>
-              <span className="mini-copy"><b>{b.title}</b><em>{b.subtitle}</em></span>
-              {b.cta_label && <i>{b.cta_label}<ArrowRight size={14} aria-hidden="true" /></i>}
+            <button key={b.id} className="quick-card" onClick={() => bannerClick(b)} title={b.cta_label || undefined}>
+              <span className="quick-ico">{promoIcon(b)}</span>
+              <span className="quick-copy"><b>{b.title}</b><em>{b.subtitle}</em></span>
+              <ChevronRight className="quick-go" size={20} aria-hidden="true" />
             </button>
           ))}
         </div>
@@ -106,7 +118,7 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
 
       {/* D. services */}
       <section>
-        <div className="sec-head"><h2>{t('Services in Minutes', 'मिनटों में सर्विस')}</h2><button className="link" onClick={() => go('/browse')}>{t('See all', 'सब देखें')}</button></div>
+        <div className="sec-head"><h2><span className="sec-bar" aria-hidden="true" />{t('Services in Minutes', 'मिनटों में सर्विस')}</h2><button className="link see-all" onClick={() => go('/browse')}>{t('See all', 'सब देखें')}<ArrowRight size={15} aria-hidden="true" /></button></div>
         {!cats ? <Spinner /> : (
           <div className="cat-grid">
             {(allCats ? cats : cats.slice(0, 11)).map((c) => (
@@ -129,22 +141,23 @@ export default function Home({ city, user, favs, onFav, onBook, flags, userPos }
         <button className="emergency-strip" onClick={() => go('/emergency')}>
           <span className="em-ico"><Siren size={24} aria-hidden="true" /></span>
           <span className="em-copy"><b>{t('Emergency Help', 'इमरजेंसी मदद')}</b><em>{t('Vehicle breakdown, electrical, water leakage — get help fast.', 'गाड़ी खराब, बिजली, पानी लीकेज — तुरंत मदद।')}</em></span>
-          <ArrowRight className="em-go" size={20} aria-hidden="true" />
+          <span className="em-go" aria-hidden="true"><ArrowRight size={18} /></span>
         </button>
       )}
 
       {/* F. offers */}
       {coupons.length > 0 && (
         <section>
-          <div className="sec-head"><h2>{t('Offers for You', 'आपके लिए ऑफर')}</h2></div>
+          <div className="sec-head"><h2><TicketPercent className="sec-ico" size={20} aria-hidden="true" />{t('Offers for You', 'आपके लिए ऑफर')}</h2></div>
           <Rail>
             {coupons.map((c) => (
               <button key={c.code} className={`offer ${copied === c.code ? 'copied' : ''}`} onClick={() => copy(c.code)} aria-label={`${t('Copy code', 'कोड कॉपी करें')} ${c.code}`}>
                 <span className="off-pct">{c.discount_type === 'PERCENT' ? `${Number(c.discount_value)}%` : `₹${Number(c.discount_value)}`}<small>OFF</small></span>
                 <span className="offer-body">
                   <b className="offer-code">{c.code}</b><em className="offer-desc">{c.description}</em>
-                  <span className="offer-copy">{copied === c.code ? <><Check size={13} aria-hidden="true" />{t('Copied', 'कॉपी हुआ')}</> : <><Copy size={13} aria-hidden="true" />{t('Tap to copy', 'कॉपी करने के लिए टैप करें')}</>}</span>
+                  {couponTerms(c) && <small className="offer-cond">{couponTerms(c)}</small>}
                 </span>
+                <span className="offer-copy" aria-hidden="true">{copied === c.code ? <Check size={18} /> : <Copy size={18} />}</span>
               </button>
             ))}
           </Rail>

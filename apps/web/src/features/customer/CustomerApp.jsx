@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, ClipboardList, Compass, HardHat, House, Languages, Loader2, MapPin, UserRound } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, ClipboardList, Compass, HardHat, House, Languages, Loader2, MapPin, Store, UserRound } from 'lucide-react';
 import LoginPage from '../auth/LoginPage.jsx';
 import { authApi, catalogApi, customerApi, geoApi, getToken, providerApi, setSession } from '../../shared/api.js';
 import { getPosition } from '../../shared/native.js';
@@ -14,6 +14,7 @@ import ProviderDashboard, { BecomeProvider } from '../provider/ProviderDashboard
 import ProviderPage from '../provider/ProviderPage.jsx';
 import { Emergency, Profile, Projects, Rentals } from './More.jsx';
 import Tracking from './Tracking.jsx';
+import '../../styles/shell.css';
 
 export default function CustomerApp() {
   const [lang, setLang] = useState(() => localStorage.getItem('dialoo-lang') || 'en');
@@ -35,6 +36,9 @@ function Shell({ lang, setLang }) {
   const [q, setQ] = useState(''); const [cityQ, setCityQ] = useState(''); const [bell, setBell] = useState(false); const [target, setTarget] = useState(null); const [cityPick, setCityPick] = useState(false);
   const [active, setActive] = useState([]); const [isProvider, setIsProvider] = useState(false);
   const [favs, toggleFav] = useFavourites(!!user);
+  // sidebar: expanded 240px / collapsed 72px, remembered in localStorage (tablets start collapsed)
+  const [collapsed, setCollapsed] = useState(() => { try { const v = localStorage.getItem('dialoo-sidebar'); if (v === '1' || v === '0') return v === '1'; } catch { /* ignore */ } return window.innerWidth < 1100; });
+  const toggleSidebar = () => setCollapsed((c) => { const n = !c; try { localStorage.setItem('dialoo-sidebar', n ? '1' : '0'); } catch { /* ignore */ } return n; });
   // ---- automatic location (Uber / Rapido style): GPS -> address -> nearest launched city ----
   const [loc, setLoc] = useState(() => { try { return { status: 'idle', ...(JSON.parse(localStorage.getItem('dialoo-loc')) || {}) }; } catch { return { status: 'idle' }; } });
   const detect = async (manual = false) => {
@@ -93,21 +97,45 @@ function Shell({ lang, setLang }) {
   if (isProvider) nav.splice(3, 0, ['/pro', HardHat, t('Partner', 'पार्टनर'), p0 === 'pro']);
   const navButtons = nav.map(([to, Icon, label, on]) => <button key={to} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined} onClick={() => go(to)}><Icon size={20} strokeWidth={on ? 2.4 : 2} aria-hidden="true" /><span>{label}</span></button>);
   const live = active[0];
+  const sideMain = [['/', House, t('Home', 'होम'), !p0, 0], ['/browse', Compass, t('Explore', 'खोजें'), p0 === 'browse', 0], ['/bookings', ClipboardList, t('Bookings', 'बुकिंग'), p0 === 'bookings' || p0 === 'booking', active.length]];
+  const sideMore = [isProvider ? ['/pro', HardHat, t('Partner', 'पार्टनर'), p0 === 'pro', 0] : ['/become-provider', Store, t('Become a Partner', 'पार्टनर बनें'), p0 === 'become-provider', 0], ['/profile', UserRound, t('Account', 'अकाउंट'), p0 === 'profile', 0]];
+  const sideItem = ([to, Icon, label, on, n]) => (
+    <button key={to} className={`side-item ${on ? 'on' : ''}`} data-tip={label} aria-current={on ? 'page' : undefined} onClick={() => go(to)}>
+      <Icon size={20} strokeWidth={on ? 2.3 : 2} aria-hidden="true" /><span className="lbl">{label}</span>{n > 0 && <i className="count" aria-label={`${n} ${t('active', 'चालू')}`}>{n}</i>}
+    </button>
+  );
+  const initials = (user?.full_name || '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'U';
 
   return (
-    <div className="shell">
+    <div className={`shell app-shell ${collapsed ? 'collapsed' : ''}`}>
       <OfflineBanner />
       <header className="topbar">
-        <button className="brand" onClick={() => go('/')} aria-label="Dialoo home"><img src="/dialoo-logo.jpeg" alt="Dialoo" /></button>
+        <button className="brand" onClick={() => go('/')} aria-label="Dialoo home"><img src="/dialoo-logo-wide.webp" alt="Dialoo" /></button>
+        <button className="icon-btn side-toggle" onClick={toggleSidebar} aria-label={collapsed ? t('Expand sidebar', 'साइडबार खोलें') : t('Collapse sidebar', 'साइडबार छोटा करें')} aria-expanded={!collapsed}>{collapsed ? <ChevronsRight size={19} aria-hidden="true" /> : <ChevronsLeft size={19} aria-hidden="true" />}</button>
         <button className="city-pill" onClick={() => setCityPick(true)} aria-label={t('Change location', 'लोकेशन बदलें')}><MapPin size={16} aria-hidden="true" /><b>{loc.place?.locality && loc.place.serviceable !== false ? `${loc.place.locality}, ` : ''}{city?.name || t('Select city', 'शहर चुनें')}</b>{loc.status === 'loading' ? <Loader2 className="spin-ico" size={15} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}</button>
         <div className="top-search"><SearchBox value={q} onChange={setQ} onSubmit={(v) => go(`/browse?q=${encodeURIComponent(v)}`)} /></div>
         <div className="top-actions">
           <button className="icon-btn lang" onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} aria-label="Change language"><Languages size={17} aria-hidden="true" /><span>{lang === 'en' ? 'हि' : 'EN'}</span></button>
-          {user ? <Bell signedIn={!!user} onOpen={() => setBell(true)} /> : <button className="btn primary sm" onClick={needLogin}>{t('Sign in', 'साइन इन')}</button>}
+          {user ? <><Bell signedIn={!!user} onOpen={() => setBell(true)} /><button className="avatar-btn" onClick={() => go('/profile')} aria-label={t('My account', 'मेरा अकाउंट')} title={user.full_name}>{initials}</button></> : <button className="btn primary sm" onClick={needLogin}>{t('Sign in', 'साइन इन')}</button>}
         </div>
       </header>
-      <nav className="sidenav" aria-label="Main">{navButtons}</nav>
-      <main className="content">{page}</main>
+      <aside className="sidenav">
+        <button className="side-brand" onClick={() => go('/')} aria-label="Dialoo home"><img className="logo-wide" src="/dialoo-logo-wide.webp" alt="Dialoo" /><img className="logo-mark" src="/dialoo-mark.webp" alt="" /></button>
+        <nav className="side-nav" aria-label="Main">
+          {sideMain.map(sideItem)}
+          <hr className="side-sep" />
+          {sideMore.map(sideItem)}
+        </nav>
+        {!isProvider && (
+          <div className="side-promo">
+            <img src="/service-icons/local-shops.webp" alt="" width="84" height="84" loading="lazy" />
+            <b>{t('Grow your business with Dialoo', 'Dialoo के साथ अपना बिज़नेस बढ़ाएँ')}</b>
+            <p>{t('Get more consumers in your city.', 'अपने शहर में ज़्यादा कंज़्यूमर पाएँ।')}</p>
+            <button className="promo-btn" onClick={() => go('/become-provider')}>{t('Join as Partner', 'पार्टनर बनें')}<ArrowRight size={15} aria-hidden="true" /></button>
+          </div>
+        )}
+      </aside>
+      <main className={`content ${!p0 || p0 === 'browse' || p0 === 'pro' ? 'wide' : 'narrow'}`}>{page}</main>
 
       {live && p0 !== 'booking' && (
         <button className="live-bar" onClick={() => go(`/booking/${live.id}`)}>

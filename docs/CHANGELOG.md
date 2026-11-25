@@ -1,5 +1,10 @@
 # Dialoo — changelog
 
+## Premium UI redesign (frontend only)
+- New design tokens (`styles/tokens.css`): palette, radius, 8px spacing, type scale. New shell (`styles/shell.css`): fixed navy gradient sidebar (240px, collapsible to 72px with tooltips, preference saved in localStorage), sticky header (collapse button, location, search, language, notifications, avatar), mobile bottom navigation.
+- Home redesigned (`features/customer/home.css`, `Home.jsx`): 58/42 hero banners using the existing plumber / shop illustrations, quick promo cards, "Services in Minutes" grid (2/3/4/6/7/8 columns by screen), emergency card, coupon cards (conditions shown from the existing coupon fields), compact empty states, pill tabs. Spinners are now skeleton loaders.
+- No backend, API, route, payload or database change in this step. Messages / Wallet / Favourites are not in the sidebar because those routes do not exist yet.
+
 ## Live tracking + role names
 - **Live tracking:** Dialoo Partner app sends GPS every 10 s while a booking is `ON_THE_WAY` (`POST /bookings/{id}/location`); the consumer's booking page shows a Leaflet/OpenStreetMap map, orange route and ETA badge (`GET /bookings/{id}/tracking`, polled every 6 s). Routes/ETA from OpenRouteService (`ORS_API_KEY`), cached per booking (45 s), daily cap, straight-line fallback. New table `booking_tracking` (latest position only, deleted when the booking leaves `ON_THE_WAY`). New: `TrackingService`, `TrackingController`, `V14__live_tracking.sql`, `shared/TrackMap.jsx`, `shared/useShareLocation.js`, `features/customer/LiveTrack.jsx`.
 - **Naming (consumer/partner apps):** Customer -> **Consumer** ("Find & book services"), Provider -> **Dialoo Partner** ("Earn with Dialoo"). Admin console labels unchanged.

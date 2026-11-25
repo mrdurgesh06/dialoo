@@ -78,7 +78,7 @@ export function SearchBox({ value, onChange, onSubmit }) {
       <Search className="s-ico" size={18} aria-hidden="true" />
       <input value={value} onChange={(e) => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 160)}
         onKeyDown={(e) => { if (e.key === 'Enter') { setOpen(false); onSubmit(value); } }}
-        placeholder={t('Search electrician, plumber, carpenter...', 'खोजें: इलेक्ट्रीशियन, प्लंबर, कारपेंटर...')} aria-label={t('Search services', 'सर्विस खोजें')} />
+        placeholder={t('Search for electrician, plumber, car repair...', 'इलेक्ट्रीशियन, प्लंबर, कार रिपेयर खोजें...')} aria-label={t('Search services', 'सर्विस खोजें')} />
       {value && <button className="clear" aria-label={t('Clear search', 'खोज हटाएँ')} onMouseDown={(e) => { e.preventDefault(); onChange(''); }}><X size={16} aria-hidden="true" /></button>}
       {open && sg && (
         <div className="suggest">

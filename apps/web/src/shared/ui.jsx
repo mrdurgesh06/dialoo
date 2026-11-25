@@ -74,7 +74,7 @@ export function Stars({ value }) {
   return <span className="rating-chip" aria-label={`Rated ${Number(value || 0).toFixed(1)} out of 5`}>{Number(value || 0).toFixed(1)}<Star size={12} fill="currentColor" aria-hidden="true" /></span>;
 }
 
-export function Spinner({ label = 'Loading…' }) { return <div className="spinner-row"><span className="spinner" />{label}</div>; }
+export function Spinner({ label = 'Loading…' }) { return <div className="skeleton-stack" role="status" aria-live="polite"><span className="sr-only">{label}</span><span className="skel card-ph" /><span className="skel card-ph" /><span className="skel line" /></div>; }
 export function Empty({ icon = <FolderOpen size={26} aria-hidden="true" />, title, text, action }) {
   return <div className="empty"><div className="empty-ico">{icon}</div><h3>{title}</h3>{text && <p>{text}</p>}{action}</div>;
 }
