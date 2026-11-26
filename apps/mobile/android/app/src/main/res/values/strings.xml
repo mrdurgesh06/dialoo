@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dialoo</string>
+    <string name="title_activity_main">Dialoo</string>
+    <string name="package_name">com.narayanix.dialoo</string>
+    <string name="custom_url_scheme">com.narayanix.dialoo</string>
+</resources>

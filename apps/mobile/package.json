@@ -1,0 +1,28 @@
+{
+  "name": "@dialoo/mobile",
+  "private": true,
+  "version": "4.0.0",
+  "description": "Dialoo Android / iOS shell (Capacitor). The UI itself lives in ../web.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "android:sync": "node scripts/build-web.mjs production && cap sync android",
+    "android:sync:dev": "node scripts/build-web.mjs androiddev && cap sync android && node scripts/cap-dev.mjs",
+    "android:open": "cap open android",
+    "ios:sync": "node scripts/build-web.mjs production && cap sync ios",
+    "ios:sync:dev": "node scripts/build-web.mjs iosdev && cap sync ios",
+    "ios:open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.6.0",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/geolocation": "8.2.4",
+    "@capacitor/network": "8.0.1",
+    "@capacitor/haptics": "8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}
