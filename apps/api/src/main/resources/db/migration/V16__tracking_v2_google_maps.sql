@@ -19,7 +19,9 @@ CREATE TABLE tracking_sessions (
   UNIQUE KEY uq_session_one_active (active_booking_id),
   INDEX idx_session_booking (booking_id, status),
   INDEX idx_session_status (status, last_location_at),
-  CONSTRAINT fk_session_booking FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+  -- No ON DELETE CASCADE here on purpose: MySQL refuses (error 1215) a cascading FK on booking_id because the stored generated column
+  -- active_booking_id is built from it. Bookings are never deleted in Dialoo, so RESTRICT is the right behaviour anyway.
+  CONSTRAINT fk_session_booking FOREIGN KEY (booking_id) REFERENCES bookings(id),
   CONSTRAINT fk_session_provider FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
 );
 
