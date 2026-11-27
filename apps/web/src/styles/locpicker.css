@@ -1,0 +1,13 @@
+.lp{display:flex;flex-direction:column;gap:10px}
+.lp-search{position:relative;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:14px;padding:0 12px;background:#fff}
+.lp-search input{flex:1;border:0;outline:0;padding:12px 0;font-size:15px;background:transparent}
+.lp-sugs{position:absolute;left:0;right:0;top:100%;margin:6px 0 0;padding:4px;list-style:none;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);z-index:20;max-height:260px;overflow:auto}
+.lp-sugs button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;padding:10px;border:0;background:transparent;border-radius:10px;cursor:pointer}
+.lp-sugs button:hover,.lp-sugs button:focus{background:#f5f7fb}.lp-sugs em{display:block;font-style:normal;font-size:12px;color:var(--muted)}
+.lp-spin{width:14px;height:14px;border:2px solid #d0d5dd;border-top-color:var(--orange);border-radius:50%;animation:spin .7s linear infinite}
+.lp-mapwrap{position:relative;height:min(40vh,300px);border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#e8edf5}
+.lp-map{position:absolute;inset:0}
+.lp-pin{position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.lp-loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.lp-chips{margin:0}.lp-label{align-self:flex-start}.lp-save{display:flex;gap:8px;align-items:center;font-size:14px}
+@keyframes spin{to{transform:rotate(360deg)}}

@@ -21,8 +21,8 @@ public class ProviderController {
   public record ProfileUpdate(@Size(max = 1000) String description, @DecimalMin("0.0") BigDecimal priceFrom, @Size(max = 500) String address, Boolean emergencyAvailable) {}
   public record PlanChoice(@NotNull Long planId) {}
 
-  private final JdbcTemplate db; private final CurrentUser me; private final Sql sql; private final NotificationService notify;
-  public ProviderController(JdbcTemplate db, CurrentUser me, Sql sql, NotificationService notify) { this.db = db; this.me = me; this.sql = sql; this.notify = notify; }
+  private final JdbcTemplate db; private final CurrentUser me; private final Sql sql; private final NotificationService notify; private final com.narayanix.dialoo.tracking.TrackingSessionService tracking;
+  public ProviderController(JdbcTemplate db, CurrentUser me, Sql sql, NotificationService notify, com.narayanix.dialoo.tracking.TrackingSessionService tracking) { this.db = db; this.me = me; this.sql = sql; this.notify = notify; this.tracking = tracking; }
 
   @PostMapping("/providers/apply") public Map<String, Object> apply(@Valid @RequestBody Apply r, Authentication a) {
     long uid = me.id(a);
@@ -81,7 +81,35 @@ public class ProviderController {
     if (available == null) throw new IllegalArgumentException("availableNow is required");
     int n = db.update("UPDATE providers SET available_now=? WHERE user_id=? AND status='APPROVED'", available, me.id(a));
     if (n == 0) throw new IllegalArgumentException("Only approved providers can change availability");
+    // Going offline removes the partner from nearby results at once. Any ACTIVE journey is deliberately NOT touched here:
+    // a booking already ON_THE_WAY keeps sharing location until arrival / cancellation (business rule, never silently dropped).
+    if (!available) tracking.clearPresenceForUser(me.id(a));
     return Map.of("availableNow", available);
+  }
+
+  public record Presence(@jakarta.validation.constraints.NotNull @jakarta.validation.constraints.DecimalMin("-90") @jakarta.validation.constraints.DecimalMax("90") Double latitude,
+                         @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.DecimalMin("-180") @jakarta.validation.constraints.DecimalMax("180") Double longitude,
+                         @jakarta.validation.constraints.DecimalMin("0") Double accuracy) {}
+
+  /** Online partner without an active journey: low-frequency position used only for nearby discovery (never shown to customers as coordinates). */
+  @PostMapping("/provider/location") public Map<String, Object> presence(@Valid @RequestBody Presence r, Authentication a) {
+    tracking.recordPresence(me.id(a), r.latitude(), r.longitude(), r.accuracy());
+    return Map.of("ok", true);
+  }
+
+  /** Derived partner state: OFFLINE | AVAILABLE | LOCATION_UNAVAILABLE | BUSY | ON_THE_WAY. */
+  @GetMapping("/provider/location/status") public Map<String, Object> presenceStatus(Authentication a) {
+    long uid = me.id(a);
+    var p = db.queryForList("SELECT p.id,p.available_now,TIMESTAMPDIFF(SECOND,l.updated_at,UTC_TIMESTAMP()) AS age_s FROM providers p LEFT JOIN provider_live_location l ON l.provider_id=p.id WHERE p.user_id=?", uid);
+    if (p.isEmpty()) throw new IllegalArgumentException("Provider profile not found");
+    long pid = ((Number) p.get(0).get("id")).longValue();
+    String state;
+    if (!Boolean.TRUE.equals(p.get(0).get("available_now"))) state = "OFFLINE";
+    else if (!db.queryForList("SELECT 1 FROM tracking_sessions WHERE provider_id=? AND status='ACTIVE'", pid).isEmpty()) state = "ON_THE_WAY";
+    else if (!db.queryForList("SELECT 1 FROM bookings WHERE provider_id=? AND status IN ('ON_THE_WAY','IN_PROGRESS')", pid).isEmpty()) state = "BUSY";
+    else if (p.get(0).get("age_s") != null && ((Number) p.get(0).get("age_s")).longValue() <= 300) state = "AVAILABLE";
+    else state = "LOCATION_UNAVAILABLE";
+    java.util.Map<String, Object> m = new java.util.LinkedHashMap<>(); m.put("state", state); m.put("lastLocationAgeSeconds", p.get(0).get("age_s")); return m;
   }
 
   @GetMapping("/provider/subscription") public Map<String, Object> subscription(Authentication a) {

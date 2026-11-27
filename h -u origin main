@@ -1,0 +1,11 @@
+* [33me559470[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;32mbackup-dialoo-local[m[33m)[m Separate Consumer and Partner
+* [33m627ba77[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Redesign Interface
+* [33m7c68f01[m Simplify Partner Steps
+* [33m9b2f2b9[m Fix build erros
+* [33m895d84a[m build time extend
+* [33mef6cd4f[m live tracking
+* [33m20e12e9[m fix Build error
+* [33me0d5fcd[m  Admin otp configuration
+* [33mf489e09[m OTP configuration Update
+* [33m6bde510[m Real Time OTP Authentication
+* [33mabfd01e[m Initial Dialoo deployment setup

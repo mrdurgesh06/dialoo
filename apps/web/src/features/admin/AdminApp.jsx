@@ -5,8 +5,9 @@ import { LangContext, Sheet, ToastHost, Spinner } from '../../shared/ui.jsx';
 import { BookingsPage, Overview, ProvidersPage, UsersPage } from './OperationsPages.jsx';
 import { CatalogPage, EmergenciesPage, NotifyPage, OffersPage, SecurityPage, SettingsPage } from './ManagementPages.jsx';
 import LocationsPage from './LocationsPage.jsx';
+import TrackingPage from './TrackingPage.jsx';
 import './admin.css';
-import { Check, Circle, ClipboardList, Eye, EyeOff, FolderTree, HardHat, LayoutDashboard, MapPin, Megaphone, Menu, Settings, ShieldCheck, Siren, TicketPercent, Users } from 'lucide-react';
+import { Check, Circle, ClipboardList, Eye, EyeOff, FolderTree, HardHat, LayoutDashboard, MapPin, Radar, Megaphone, Menu, Settings, ShieldCheck, Siren, TicketPercent, Users } from 'lucide-react';
 import { ArrowLeft } from 'lucide-react';
 
 const IDLE_LOGOUT_MS = 20 * 60 * 1000; // sign out after 20 minutes without any activity
@@ -124,7 +125,7 @@ function AdminLogin({ onDone, notice }) {
 
 const NAV = [
   ['overview', LayoutDashboard, 'Overview', 'DASHBOARD_VIEW'], ['bookings', ClipboardList, 'Bookings', 'BOOKING_VIEW'], ['providers', HardHat, 'Providers', 'PROVIDER_VIEW'], ['users', Users, 'Users', 'USER_VIEW'],
-  ['catalog', FolderTree, 'Catalog', 'CATALOG_MANAGE'], ['locations', MapPin, 'Locations', 'LOCATION_MANAGE'], ['offers', TicketPercent, 'Offers & banners', 'COUPON_MANAGE'], ['emergencies', Siren, 'Emergencies', 'BOOKING_VIEW'],
+  ['catalog', FolderTree, 'Catalog', 'CATALOG_MANAGE'], ['locations', MapPin, 'Locations', 'LOCATION_MANAGE'], ['offers', TicketPercent, 'Offers & banners', 'COUPON_MANAGE'], ['emergencies', Siren, 'Emergencies', 'BOOKING_VIEW'], ['tracking', Radar, 'Live tracking', 'BOOKING_VIEW'],
   ['notify', Megaphone, 'Broadcast', 'NOTIFY_BROADCAST'], ['security', ShieldCheck, 'Security & audit', 'AUDIT_VIEW'], ['settings', Settings, 'Settings', 'SETTINGS_MANAGE'],
 ];
 
@@ -148,7 +149,7 @@ function AdminShell({ user, onLogout }) {
     return () => { ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((e) => window.removeEventListener(e, touch)); clearInterval(timer); };
   }, []); // eslint-disable-line
   const open = (n) => { setBell(false); if (n.entity_type === 'BOOKING') setPage('bookings'); else if (n.entity_type === 'PROVIDER') setPage('providers'); else if (n.entity_type === 'EMERGENCY') setPage('emergencies'); };
-  const Page = { overview: Overview, bookings: BookingsPage, providers: ProvidersPage, users: UsersPage, catalog: CatalogPage, locations: LocationsPage, offers: OffersPage, emergencies: EmergenciesPage, notify: NotifyPage, security: SecurityPage, settings: SettingsPage }[page] || Overview;
+  const Page = { overview: Overview, bookings: BookingsPage, providers: ProvidersPage, users: UsersPage, catalog: CatalogPage, locations: LocationsPage, offers: OffersPage, emergencies: EmergenciesPage, tracking: TrackingPage, notify: NotifyPage, security: SecurityPage, settings: SettingsPage }[page] || Overview;
   return (
     <div className="adm">
       <aside className={`adm-side ${menu ? 'open' : ''}`}>

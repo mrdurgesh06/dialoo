@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import LocationPicker from '../../shared/LocationPicker.jsx';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, ClipboardList, Compass, House, Languages, Loader2, MapPin, UserRound } from 'lucide-react';
 import LoginPage from '../auth/LoginPage.jsx';
 import { authApi, catalogApi, customerApi, geoApi, getToken, setSession } from '../../shared/api.js';
@@ -68,13 +69,25 @@ function ConsumerShell({ lang, setLang, user, onNeedLogin, onLogout }) {
   const toggleSidebar = () => setCollapsed((c) => { const n = !c; try { localStorage.setItem('dialoo-sidebar', n ? '1' : '0'); } catch { /* ignore */ } return n; });
   // ---- automatic location (Uber / Rapido style): GPS -> address -> nearest launched city ----
   const [loc, setLoc] = useState(() => { try { return { status: 'idle', ...(JSON.parse(localStorage.getItem('dialoo-loc')) || {}) }; } catch { return { status: 'idle' }; } });
+  const [picker, setPicker] = useState(false); const pickerDone = useRef(null); const [tcfg, setTcfg] = useState({});
+  useEffect(() => { if (user) customerApi.trackingConfig().then(setTcfg).catch(() => {}); }, [user]);
+  // Map / search selector. Resolves with the confirmed place (or null when closed). A confirmed choice is never replaced by auto-detect.
+  const pickLocation = () => new Promise((resolve) => { pickerDone.current = resolve; setPicker(true); });
+  const closePicker = (res) => { setPicker(false); const r = pickerDone.current; pickerDone.current = null; if (r) r(res || null); };
+  const onPicked = (res) => {
+    const next = { status: 'ok', pos: { lat: res.lat, lng: res.lng }, place: res.place, confirmed: true };
+    setLoc(next); try { localStorage.setItem('dialoo-loc', JSON.stringify({ pos: next.pos, place: next.place, confirmed: true })); } catch { /* ignore */ }
+    if (res.cityId && res.serviceable) { const c = cities.find((x) => x.id === res.cityId); if (c) { sessionStorage.setItem('dialoo-city-manual', '1'); setCity(c); } }
+    setCityPick(false); closePicker(res);
+  };
   const detect = async (manual = false) => {
+    if (!manual && loc.confirmed) return loc;   // never silently replace a location the user confirmed
     setLoc((l) => ({ ...l, status: 'loading' }));
     try {
       const p = await getPosition();
       let place = null;
       try { place = await geoApi.reverse(p.lat, p.lng); } catch { /* offline: keep coordinates only */ }
-      const next = { status: 'ok', pos: p, place };
+      const next = { status: 'ok', pos: p, place, confirmed: false };
       setLoc(next); try { localStorage.setItem('dialoo-loc', JSON.stringify({ pos: p, place })); } catch { /* ignore */ }
       if (place && place.cityId) {
         if (place.serviceable) {
@@ -162,11 +175,15 @@ function ConsumerShell({ lang, setLang, user, onNeedLogin, onLogout }) {
         <button className="btn outline block locate-btn" disabled={loc.status === 'loading'} onClick={() => detect(true).then(() => setCityPick(false)).catch(() => {})}><MapPin size={17} aria-hidden="true" /> {loc.status === 'loading' ? t('Detecting…', 'पता लगा रहे हैं…') : t('Use my current location', 'मेरी मौजूदा लोकेशन इस्तेमाल करें')}</button>
         {loc.place?.address && <p className="muted small loc-line"><MapPin size={13} aria-hidden="true" /> {loc.place.address}</p>}
         {loc.status === 'denied' && <p className="error">{t('Location permission is off. Enable it in phone Settings → Apps → Dialoo → Permissions.', 'लोकेशन की अनुमति बंद है। फ़ोन सेटिंग्स → ऐप्स → Dialoo → परमिशन में चालू करें।')}</p>}
+        <button className="btn primary block locate-btn" onClick={() => { setCityPick(false); pickLocation(); }}><MapPin size={17} aria-hidden="true" /> {t('Search address or pick on map', 'पता खोजें या मैप पर चुनें')}</button>
         <input className="city-search" value={cityQ} onChange={(e) => setCityQ(e.target.value)} placeholder={t('Search your city or district…', 'अपना शहर या ज़िला खोजें…')} />
         <div className="radio-list city-list">{cities.filter((c) => !cityQ.trim() || `${c.name} ${c.district}`.toLowerCase().includes(cityQ.trim().toLowerCase())).slice(0, 120).map((c) => <label key={c.id} className={`radio ${city?.id === c.id ? 'on' : ''}`}><input type="radio" checked={city?.id === c.id} onChange={() => { sessionStorage.setItem('dialoo-city-manual', '1'); setCity(c); setCityPick(false); }} /><span>{c.name}</span><em className="muted">{c.district}</em></label>)}</div>
         <p className="muted small">{t('All Uttar Pradesh cities are listed. More states are coming soon.', 'उत्तर प्रदेश के सभी शहर उपलब्ध हैं। जल्द ही और राज्य आएँगे।')}</p>
       </Sheet>
-      <Checkout target={target} user={user} loc={loc} onLocate={() => detect(true)} onClose={() => setTarget(null)} />
+      <Sheet open={picker} onClose={() => closePicker(null)} title={t('Choose service location', 'सर्विस की लोकेशन चुनें')}>
+        {picker && <LocationPicker initial={loc.pos} saved={[]} debounceMs={tcfg.autocompleteDebounceMillis || 400} canSave={!!user} onConfirm={onPicked} />}
+      </Sheet>
+      <Checkout target={target} user={user} loc={loc} onLocate={() => detect(true)} onPick={pickLocation} onClose={() => setTarget(null)} />
     </div>
   );
 }

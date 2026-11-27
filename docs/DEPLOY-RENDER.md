@@ -76,7 +76,7 @@ jdbc:mysql://<server>.mysql.database.azure.com:3306/dialoodb?sslMode=REQUIRED&se
 - [ ] `FLYWAY_EXTRA_LOCATION=classpath:db/none` (demo providers nahi)
 - [ ] Custom domain (API + website), `FRONTEND_ORIGIN` me wahi domain
 - [ ] Azure MySQL: automated backups on, firewall sirf Render IPs ke liye
-- [ ] Apna geocoder / paid provider (`GEO_NOMINATIM_URL`), public Nominatim sirf halke use ke liye hai
+- [ ] Google Maps billing alert + daily quota set kiya (`docs/GOOGLE-MAPS-SETUP.md`)
 - [ ] `JWT_SECRET` Render ne generate kiya hai — kisi ke saath share na karein
 
 ## Troubleshooting
@@ -105,15 +105,19 @@ Customer ka OTP login MSG91 widget se chalta hai: SMS MSG91 bhejta hai, code Dia
 
 **Dhyan dein:** ye sirf customer OTP login ko cover karta hai. Admin login 2FA aur Forgot password abhi bhi server-side SMS (`SMS_PROVIDER`) se chalte hain, jiske liye DLT template chahiye.
 
-## Live tracking (Leaflet + OpenStreetMap + OpenRouteService)
+## Live tracking (Google Maps + WebSocket)
 
-1. openrouteservice.org par free account banayein -> **Dashboard -> Request a token** (Standard) -> key copy karein.
-2. Render -> `dialoo-api` -> Environment me `ORS_API_KEY=<key>` daalein. (Na daalein to bhi tracking chalegi, bas ETA seedhi doori se andaza hoga.)
-3. Redeploy. Flyway apne aap `booking_tracking` table bana dega (`V14__live_tracking.sql`).
-4. Test: ek booking Accept karein -> Dialoo Partner "I am on the way" dabaye (location ki permission allow kare) -> consumer ke booking page par map, orange route aur ETA dikhega.
+Poori detail: `docs/TRACKING.md` aur `docs/GOOGLE-MAPS-SETUP.md`.
+
+1. Google Cloud me billing on karein, 4 APIs enable karein: Maps JavaScript, Places (New), Geocoding, Routes.
+2. **Browser key** (HTTP referrer + Maps JavaScript/Places restriction) -> Render `dialoo-web` -> `VITE_GOOGLE_MAPS_API_KEY` aur `VITE_GOOGLE_MAP_ID` (build time, phir redeploy).
+3. **Server key** (sirf Routes + Geocoding) -> Render `dialoo-api` -> `GOOGLE_MAPS_SERVER_API_KEY`. (Na daalein to bhi tracking chalegi, ETA seedhi doori se andaza hoga.)
+4. `FRONTEND_ORIGIN` me website + app ke saare origins hon (ye WebSocket ka allow-list bhi hai).
+5. Redeploy. Flyway `V16__tracking_v2_google_maps.sql` apne aap chalayega (sirf naye tables/columns).
+6. Test: booking Accept -> Partner "I am on the way" (location allow) -> consumer page par live map, route, ETA.
 
 Dhyan dein:
-- Dialoo Partner ka app **khula (foreground)** rehna chahiye, tabhi location jati hai. App minimise/lock hone par updates ruk sakte hain. Background tracking ke liye baad me Capacitor background-geolocation plugin lagana hoga.
-- Consumer ka booking me address-location (GPS) save hona chahiye, tabhi route banta hai. "Use my current location" se booking karne par ye save hota hai.
-- OSM tiles aur ORS free plan sirf kam traffic ke liye hain. ORS ka daily cap `ORS_DAILY_LIMIT` (default 1800) se control hota hai; cap ke baad estimate dikhta hai. Users badhne par apna tile server ya paid plan lein.
-- Location sirf `ON_THE_WAY` ke dauran rehti hai aur status badalte hi delete ho jati hai.
+- WebSocket ke liye API instance sleep nahi hona chahiye (free plan par spin-down se connection tootega) - production me paid instance lein.
+- Google ka billing alert + daily quota zaroor set karein. Server-side daily caps: `TRACKING_ROUTES_DAILY_LIMIT`, `GEOCODE_DAILY_LIMIT`.
+- Background tracking (screen lock) ke liye `docs/BACKGROUND-LOCATION.md` follow karein; bina plugin ke app khula rakhna padta hai.
+- Location sirf `ON_THE_WAY` se arrival tak share hoti hai; baad me live position delete, sampled history 7 din baad delete.

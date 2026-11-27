@@ -56,6 +56,8 @@ public class SecurityConfig {
         .referrerPolicy(r -> r.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
       .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
       .authorizeHttpRequests(a -> a
+        // STOMP handshake: identity is proven in the CONNECT frame (JWT) and every SUBSCRIBE/SEND is authorised in StompAuthInterceptor.
+        .requestMatchers("/ws/tracking", "/ws/tracking/**").permitAll()
         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/otp/**", "/api/v1/auth/password/forgot/**",
           "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/health", "/actuator/health/**").permitAll()
         .requestMatchers("/api/v1/admin/auth/login", "/api/v1/admin/auth/verify", "/api/v1/admin/auth/verify-widget", "/api/v1/admin/auth/forgot", "/api/v1/admin/auth/reset", "/api/v1/admin/auth/change-initial").permitAll()
@@ -66,6 +68,7 @@ public class SecurityConfig {
         // ---- One login = one side. A Consumer session can never call Partner APIs and a Partner session can never call Consumer APIs. ----
         .requestMatchers("/api/v1/provider/**", "/api/v1/providers/apply", "/api/v1/reviews/*/reply").hasAuthority("ACTOR_PROVIDER")
         .requestMatchers(HttpMethod.POST, "/api/v1/projects/*/quotes").hasAuthority("ACTOR_PROVIDER")
+        .requestMatchers("/api/v1/partners/nearby").hasAuthority("ACTOR_CUSTOMER")
         .requestMatchers("/api/v1/checkout/**", "/api/v1/me/**", "/api/v1/emergencies").hasAuthority("ACTOR_CUSTOMER")
         .requestMatchers(HttpMethod.POST, "/api/v1/bookings", "/api/v1/reviews", "/api/v1/rentals", "/api/v1/projects").hasAuthority("ACTOR_CUSTOMER")
         .requestMatchers(HttpMethod.GET, "/api/v1/bookings").hasAuthority("ACTOR_CUSTOMER")

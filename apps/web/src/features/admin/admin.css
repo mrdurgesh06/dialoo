@@ -42,3 +42,6 @@
 .temp-pw{display:flex;gap:8px;align-items:center;background:#0f172a;color:#fff;border-radius:12px;padding:14px 16px;font:700 20px ui-monospace,Consolas,monospace;letter-spacing:1px;justify-content:space-between;word-break:break-all}.temp-pw button{background:#2f6bff;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:600 13px system-ui}
 .loc-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}.loc-add{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-top:10px}.loc-add input{min-width:0}
 @media(max-width:820px){.loc-cols{grid-template-columns:1fr}.loc-add{grid-template-columns:1fr 1fr}}
+.trk-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.trk-tile{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px}.trk-tile b{display:block;font-size:24px}.trk-tile span{font-size:12px;color:#667085}.trk-tile.warn{border-color:#f5b4ab;background:#fff5f3}
+.trk-adminmap{height:340px;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden}

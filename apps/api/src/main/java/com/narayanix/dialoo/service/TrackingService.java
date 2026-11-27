@@ -1,103 +1,131 @@
 package com.narayanix.dialoo.service;
 
-import java.time.LocalDate;
-import java.time.ZoneOffset;
+import com.narayanix.dialoo.tracking.MapsUsageMeter;
+import com.narayanix.dialoo.tracking.RouteMath;
+import com.narayanix.dialoo.tracking.TrackingProperties;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Route + ETA between the provider and the customer's address using OpenRouteService (free API key).
- * Routes are cached per booking and recomputed only every ~45 s (or when the provider moved >150 m), and a daily
- * request cap keeps the free quota safe. When ORS is not configured, fails or the cap is reached, a straight-line
- * estimate (distance x 1.3 / average speed) is returned instead, flagged with source "estimate".
+ * Route + ETA between the partner and the consumer's address using the Google Routes API (computeRoutes).
+ *
+ * Cost control: GPS updates NEVER call Google. A route is (re)computed only
+ *   - once when the journey starts (no cached route yet),
+ *   - every {@code routes-refresh-seconds} (default 5 min),
+ *   - immediately when the partner leaves the route by more than {@code route-deviation-meters}, but never more often than
+ *     {@code routes-min-gap-seconds},
+ *   - when the destination changes.
+ * Between recalculations the remaining distance and ETA are derived locally from the cached polyline (see RouteMath.progress).
+ * A hard daily cap ({@code routes-daily-limit}) and a short circuit breaker after failures fall back to a straight-line estimate
+ * (source = "estimate"), so tracking keeps working when Google is unavailable, over quota or the key is invalid.
+ * Routes stay in memory only and are forgotten when the journey ends (Google Maps Platform caching terms).
  */
 @Service
 public class TrackingService {
   private static final Logger log = LoggerFactory.getLogger(TrackingService.class);
-  private static final String ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
-  private static final long REFRESH_MS = 45_000, ESTIMATE_REFRESH_MS = 20_000;
-  private static final double MOVE_REFRESH_M = 150;
+  private static final String ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
+  private static final String FIELD_MASK = "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline";
+  public static final String API = "ROUTES_COMPUTE";
+  private static final long BREAKER_MS = 60_000;
 
   public record Route(List<double[]> coordinates, double distanceMeters, double durationSeconds, String source,
                       long computedAt, double fromLat, double fromLng, double toLat, double toLng) {}
 
-  private final String apiKey; private final int dailyLimit; private final double fallbackKmh;
-  private final RestClient client = RestClient.builder().build();
+  private final String apiKey; private final TrackingProperties cfg; private final MapsUsageMeter meter;
+  private final RestClient client;
   private final Map<Long, Route> cache = new ConcurrentHashMap<>();
-  private final AtomicInteger usedToday = new AtomicInteger(); private volatile LocalDate usedDay = LocalDate.now(ZoneOffset.UTC);
+  private volatile long googleBlockedUntil = 0; private volatile long lastWarn = 0;
 
-  public TrackingService(@Value("${app.tracking.ors-api-key:}") String apiKey,
-      @Value("${app.tracking.ors-daily-limit:1800}") int dailyLimit,
-      @Value("${app.tracking.fallback-speed-kmh:25}") double fallbackKmh) {
-    this.apiKey = apiKey.trim(); this.dailyLimit = dailyLimit; this.fallbackKmh = Math.max(5, fallbackKmh);
+  public TrackingService(@Value("${app.maps.server-api-key:}") String apiKey, TrackingProperties cfg, MapsUsageMeter meter) {
+    this.apiKey = apiKey == null ? "" : apiKey.trim(); this.cfg = cfg; this.meter = meter;
+    SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
+    f.setConnectTimeout(2_000); f.setReadTimeout(4_000);
+    this.client = RestClient.builder().requestFactory(f).build();
   }
 
+  public Route cached(long bookingId) { return cache.get(bookingId); }
+  public void forget(long bookingId) { cache.remove(bookingId); }
+
+  /** True when a new route must be computed now. Cheap: no I/O. */
+  public boolean due(long bookingId, double lat, double lng, double toLat, double toLng, long now) {
+    Route c = cache.get(bookingId);
+    if (c == null || !same(c.toLat(), toLat) || !same(c.toLng(), toLng)) return true;
+    long age = now - c.computedAt();
+    if (age >= cfg.getRoutesRefreshSeconds() * 1000L) return true;
+    if (age < cfg.getRoutesMinGapSeconds() * 1000L) return false;
+    if ("estimate".equals(c.source())) return googleAvailable(now);   // try to upgrade an estimate once Google is usable again
+    RouteMath.Progress p = RouteMath.progress(c.coordinates(), lat, lng);
+    return p != null && p.offRouteMeters() > cfg.getRouteDeviationMeters();
+  }
+
+  /** Legacy entry point (kept for compatibility): cached route unless it is due. */
   public Route route(long bookingId, double fromLat, double fromLng, double toLat, double toLng) {
     long now = System.currentTimeMillis();
-    Route c = cache.get(bookingId);
-    if (c != null && same(c.toLat, toLat) && same(c.toLng, toLng)) {
-      long age = now - c.computedAt;
-      boolean moved = haversine(c.fromLat, c.fromLng, fromLat, fromLng) > MOVE_REFRESH_M;
-      long ttl = "ors".equals(c.source) ? REFRESH_MS : ESTIMATE_REFRESH_MS;
-      if (age < ttl && !moved) return c;
-      if (age < 8_000) return c; // never recompute more than once per 8 s, even when moving fast
-    }
-    Route r = fromOrs(fromLat, fromLng, toLat, toLng, now);
+    return due(bookingId, fromLat, fromLng, toLat, toLng, now) ? compute(bookingId, fromLat, fromLng, toLat, toLng) : cache.get(bookingId);
+  }
+
+  /** Always computes a fresh route (Google, else estimate) and caches it. Blocking: call from a worker thread, not the WebSocket thread. */
+  public Route compute(long bookingId, double fromLat, double fromLng, double toLat, double toLng) {
+    long now = System.currentTimeMillis();
+    Route r = fromGoogle(fromLat, fromLng, toLat, toLng, now);
     if (r == null) r = estimate(fromLat, fromLng, toLat, toLng, now);
     cache.put(bookingId, r);
-    if (cache.size() > 2000) cache.entrySet().removeIf(e -> now - e.getValue().computedAt > 3_600_000);
+    if (cache.size() > 2000) cache.entrySet().removeIf(e -> now - e.getValue().computedAt() > 3_600_000);
     return r;
   }
 
-  public void forget(long bookingId) { cache.remove(bookingId); }
+  private boolean googleAvailable(long now) { return !apiKey.isBlank() && now >= googleBlockedUntil; }
 
-  private Route fromOrs(double fromLat, double fromLng, double toLat, double toLng, long now) {
-    if (apiKey.isBlank() || !takeQuota()) return null;
+  @SuppressWarnings("unchecked")
+  private Route fromGoogle(double fromLat, double fromLng, double toLat, double toLng, long now) {
+    if (!googleAvailable(now)) return null;
+    if (!meter.tryAcquire(API, cfg.getRoutesDailyLimit())) { warnOnce("Google Routes daily cap reached - using straight-line estimates until 00:00 UTC"); return null; }
     try {
-      var uri = UriComponentsBuilder.fromUriString(ORS_URL).queryParam("start", fromLng + "," + fromLat).queryParam("end", toLng + "," + toLat).build().toUri();
-      @SuppressWarnings("unchecked")
-      Map<String, Object> res = client.get().uri(uri).header("Authorization", apiKey).accept(MediaType.APPLICATION_JSON, MediaType.valueOf("application/geo+json")).retrieve().body(Map.class);
-      @SuppressWarnings("unchecked") Map<String, Object> f = (Map<String, Object>) ((List<?>) res.get("features")).get(0);
-      @SuppressWarnings("unchecked") Map<String, Object> summary = (Map<String, Object>) ((Map<String, Object>) f.get("properties")).get("summary");
-      @SuppressWarnings("unchecked") List<List<Number>> pts = (List<List<Number>>) ((Map<String, Object>) f.get("geometry")).get("coordinates");
-      int step = Math.max(1, pts.size() / 400);
-      List<double[]> coords = new ArrayList<>();
-      for (int i = 0; i < pts.size(); i += step) coords.add(new double[]{round5(pts.get(i).get(1).doubleValue()), round5(pts.get(i).get(0).doubleValue())});
-      List<Number> last = pts.get(pts.size() - 1); coords.add(new double[]{round5(last.get(1).doubleValue()), round5(last.get(0).doubleValue())});
-      return new Route(coords, ((Number) summary.get("distance")).doubleValue(), ((Number) summary.get("duration")).doubleValue(), "ors", now, fromLat, fromLng, toLat, toLng);
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("origin", Map.of("location", Map.of("latLng", Map.of("latitude", fromLat, "longitude", fromLng))));
+      body.put("destination", Map.of("location", Map.of("latLng", Map.of("latitude", toLat, "longitude", toLng))));
+      String mode = "TWO_WHEELER".equalsIgnoreCase(cfg.getRoutesTravelMode()) ? "TWO_WHEELER" : "DRIVE";
+      body.put("travelMode", mode);
+      // routingPreference is only sent for DRIVE. TRAFFIC_UNAWARE is the lowest-cost tier; TRAFFIC_AWARE is billed at a higher tier.
+      if (mode.equals("DRIVE")) body.put("routingPreference", "TRAFFIC_AWARE".equalsIgnoreCase(cfg.getRoutesPreference()) ? "TRAFFIC_AWARE" : "TRAFFIC_UNAWARE");
+      body.put("units", "METRIC");
+      Map<String, Object> res = client.post().uri(ROUTES_URL).contentType(MediaType.APPLICATION_JSON)
+        .header("X-Goog-Api-Key", apiKey).header("X-Goog-FieldMask", FIELD_MASK).body(body).retrieve().body(Map.class);
+      List<Map<String, Object>> routes = res == null ? null : (List<Map<String, Object>>) res.get("routes");
+      if (routes == null || routes.isEmpty()) { meter.failed(API); return null; }   // e.g. no drivable route: estimate instead
+      Map<String, Object> r0 = routes.get(0);
+      double dist = ((Number) r0.get("distanceMeters")).doubleValue();
+      double secs = Double.parseDouble(String.valueOf(r0.get("duration")).replace("s", ""));
+      String enc = (String) ((Map<String, Object>) r0.get("polyline")).get("encodedPolyline");
+      List<double[]> pts = RouteMath.thin(RouteMath.decodePolyline(enc), 500);
+      List<double[]> rounded = new ArrayList<>(pts.size());
+      for (double[] p : pts) rounded.add(new double[]{Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5});
+      return new Route(rounded, dist, secs, "google", now, fromLat, fromLng, toLat, toLng);
     } catch (Exception e) {
-      log.warn("OpenRouteService route failed, using estimate: {}", e.toString());
+      meter.failed(API);
+      googleBlockedUntil = now + BREAKER_MS;   // invalid key, quota exceeded, timeout, outage: back off for a minute
+      warnOnce("Google Routes request failed, using estimate for the next minute: " + e.getClass().getSimpleName() + " " + clip(e.getMessage()));
       return null;
     }
   }
 
   private Route estimate(double fromLat, double fromLng, double toLat, double toLng, long now) {
-    double straight = haversine(fromLat, fromLng, toLat, toLng), road = straight * 1.3;
-    double secs = road / (fallbackKmh / 3.6);
+    double straight = RouteMath.haversine(fromLat, fromLng, toLat, toLng), road = straight * 1.3;
+    double secs = road / (Math.max(5, cfg.getFallbackSpeedKmh()) / 3.6);
     return new Route(List.of(new double[]{fromLat, fromLng}, new double[]{toLat, toLng}), road, secs, "estimate", now, fromLat, fromLng, toLat, toLng);
   }
 
-  private boolean takeQuota() {
-    LocalDate today = LocalDate.now(ZoneOffset.UTC);
-    if (!today.equals(usedDay)) { synchronized (this) { if (!today.equals(usedDay)) { usedDay = today; usedToday.set(0); } } }
-    return usedToday.incrementAndGet() <= dailyLimit;
-  }
-
+  private void warnOnce(String msg) { long n = System.currentTimeMillis(); if (n - lastWarn > 60_000) { lastWarn = n; log.warn(msg); } }
+  private static String clip(String s) { return s == null ? "" : s.substring(0, Math.min(160, s.length())).replaceAll("key=[^&\\s]+", "key=***"); }
   private static boolean same(double a, double b) { return Math.abs(a - b) < 1e-6; }
-  private static double round5(double v) { return Math.round(v * 1e5) / 1e5; }
-  static double haversine(double lat1, double lon1, double lat2, double lon2) {
-    double r = 6371000, p1 = Math.toRadians(lat1), p2 = Math.toRadians(lat2), dp = Math.toRadians(lat2 - lat1), dl = Math.toRadians(lon2 - lon1);
-    double a = Math.sin(dp / 2) * Math.sin(dp / 2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
-    return 2 * r * Math.asin(Math.min(1, Math.sqrt(a)));
-  }
 }

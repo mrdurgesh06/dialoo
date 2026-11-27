@@ -49,14 +49,12 @@ services:
         sync: false
       - key: MSG91_AUTH_KEY
         sync: false                    # secret - server-side only (verifies the widget token)
-      # --- Live tracking (Leaflet + OpenStreetMap + OpenRouteService). Free key: openrouteservice.org ---
-      - key: ORS_API_KEY
+      # --- Live tracking (Google Maps Platform, SERVER key: Routes API + Geocoding API only) ---
+      - key: GOOGLE_MAPS_SERVER_API_KEY
         sync: false                    # without it, tracking still works with a straight-line ETA estimate
       # --- demo marketplace data. For production use classpath:db/none ---
       - key: SPRING_FLYWAY_LOCATIONS
         value: classpath:db/migration
-      - key: GEO_USER_AGENT
-        sync: false                    # e.g. Dialoo/5.0 (you@example.com)
 
   # ------------------------------------------------------------------ WEBSITE
   - type: web
@@ -74,6 +72,10 @@ services:
         value: "20"
       - key: VITE_API_BASE_URL
         sync: false                    # https://<your-api-service>.onrender.com/api/v1   (needed at build time)
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false                    # restricted BROWSER key (needed at build time)
+      - key: VITE_GOOGLE_MAP_ID
+        sync: false
     routes:
       - type: rewrite                  # /admin and every app route open index.html
         source: /*

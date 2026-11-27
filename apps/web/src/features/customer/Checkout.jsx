@@ -7,7 +7,7 @@ import { CalendarClock, Clock, MapPin, TicketPercent, Zap } from 'lucide-react';
 import { ProviderAvatar } from '../../shared/parts.jsx';
 
 /** Flipkart-style checkout: pick service, address, time, coupon, see the bill, place booking. */
-export default function Checkout({ target, user, loc, onLocate, onClose, onDone }) {
+export default function Checkout({ target, user, loc, onLocate, onPick, onClose, onDone }) {
   const t = useT(); const toast = useToast();
   const p = target?.provider;
   const [cat, setCat] = useState(null); const [services, setServices] = useState([]); const [serviceId, setServiceId] = useState(target?.serviceId || '');
@@ -23,7 +23,7 @@ export default function Checkout({ target, user, loc, onLocate, onClose, onDone 
     setServiceId(target?.serviceId || ''); setCode(''); setBill(null); setErr(''); setWhen('NOW'); setSlot(''); setNotes('');
     catalogApi.provider(p.id).then((d) => setServices(d.services || [])).catch(() => setServices([]));
     setCoords(null);
-    customerApi.addresses().then((a) => { setAddresses(a); const d = a.find((x) => x.is_default) || a[0]; if (d) setAddress(d.address_line); else if (loc?.place?.address) { setAddress(loc.place.address); setCoords(loc.pos || null); } else setAddress(''); }).catch(() => { if (loc?.place?.address) { setAddress(loc.place.address); setCoords(loc.pos || null); } });
+    customerApi.addresses().then((a) => { setAddresses(a); const d = a.find((x) => x.is_default) || a[0]; if (d) { setAddress(d.address_line); if (d.latitude != null) setCoords({ lat: Number(d.latitude), lng: Number(d.longitude) }); } else if (loc?.place?.address) { setAddress(loc.place.address); setCoords(loc.pos || null); } else setAddress(''); }).catch(() => { if (loc?.place?.address) { setAddress(loc.place.address); setCoords(loc.pos || null); } });
     catalogApi.coupons().then(setCoupons).catch(() => {});
     setName(user?.full_name || ''); setPhone(user?.phone || '');
   }, [p?.id]); // eslint-disable-line
@@ -42,6 +42,11 @@ export default function Checkout({ target, user, loc, onLocate, onClose, onDone 
     setLocBusy(true); setErr('');
     try { const r = await onLocate(); if (r?.place?.address) setAddress(r.place.address); setCoords(r?.pos || null); if (!r?.place?.address) setErr(t('Got your GPS spot, but could not read the street address. Please type it.', 'GPS मिल गया पर पता नहीं पढ़ पाए। कृपया पता लिखें।')); }
     catch { /* toast shown by onLocate */ } finally { setLocBusy(false); }
+  };
+  const pickOnMap = async () => {
+    if (!onPick) return;
+    const r = await onPick();
+    if (r) { setAddress(r.address); setCoords({ lat: r.lat, lng: r.lng }); setErr(''); }   // only after an explicit confirmation by the customer
   };
   const place = async () => {
     setErr('');
@@ -75,8 +80,8 @@ export default function Checkout({ target, user, loc, onLocate, onClose, onDone 
       )}
 
       <div className="field"><label htmlFor="co-addr">{t('Service address', 'सर्विस का पता')}</label>
-        {addresses.length > 0 && <div className="chip-row scroll">{addresses.map((a) => <button type="button" key={a.id} className={`chip ${address === a.address_line ? 'on' : ''}`} onClick={() => setAddress(a.address_line)}>{a.label}</button>)}</div>}
-        <button type="button" className="chip locate-chip" disabled={locBusy} onClick={useMyLocation}><MapPin size={15} aria-hidden="true" /> {locBusy ? t('Detecting…', 'पता लगा रहे हैं…') : t('Use current location', 'मौजूदा लोकेशन')}</button>
+        {addresses.length > 0 && <div className="chip-row scroll">{addresses.map((a) => <button type="button" key={a.id} className={`chip ${address === a.address_line ? 'on' : ''}`} onClick={() => { setAddress(a.address_line); setCoords(a.latitude != null ? { lat: Number(a.latitude), lng: Number(a.longitude) } : null); }}>{a.label}</button>)}</div>}
+        <button type="button" className="chip locate-chip" disabled={locBusy} onClick={useMyLocation}><MapPin size={15} aria-hidden="true" /> {locBusy ? t('Detecting…', 'पता लगा रहे हैं…') : t('Use current location', 'मौजूदा लोकेशन')}</button>{onPick && <button type="button" className="chip locate-chip" onClick={pickOnMap}><MapPin size={15} aria-hidden="true" /> {t('Search / pick on map', 'खोजें / मैप पर चुनें')}</button>}
         <textarea id="co-addr" rows="2" value={address} onChange={(e) => { setAddress(e.target.value); setCoords(null); }} placeholder={t('House no, street, landmark, area', 'मकान नं., गली, लैंडमार्क, इलाका')} />
       </div>
       <div className="two">

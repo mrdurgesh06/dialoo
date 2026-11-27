@@ -59,7 +59,7 @@ async function send(path, { method, body, auth, admin }) {
 
 export async function api(path, { method = 'GET', body, auth = true, admin = false } = {}) {
   let response;
-  const cacheable = method === 'GET' && !admin;
+  const cacheable = method === 'GET' && !admin && !path.includes('/tracking');   // live locations are never written to the offline cache (privacy)
   const key = cacheable ? ckey(path, auth) : null;
   try { response = await send(path, { method, body, auth, admin }); }
   catch {
@@ -134,7 +134,14 @@ export const customerApi = {
   bookings: () => api('/bookings'),
   booking: (id) => api(`/bookings/${id}`),
   tracking: (id) => api(`/bookings/${id}/tracking`),
-  sendLocation: (id, body) => api(`/bookings/${id}/location`, { method: 'POST', body }),
+  trackingStart: (id) => api(`/bookings/${id}/tracking/start`, { method: 'POST' }),
+  trackingArrive: (id) => api(`/bookings/${id}/tracking/arrive`, { method: 'POST' }),
+  trackingStop: (id) => api(`/bookings/${id}/tracking/stop`, { method: 'POST' }),
+  sendLocation: (id, body) => api(`/bookings/${id}/tracking/location`, { method: 'POST', body }),
+  trackingConfig: () => api('/tracking/config'),
+  nearby: (p) => api(`/partners/nearby?${new URLSearchParams(Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')))}`),
+  addAddress: (body) => api('/me/addresses', { method: 'POST', body }),
+  updateAddress: (id, body) => api(`/me/addresses/${id}`, { method: 'PUT', body }),
   setStatus: (id, body) => api(`/bookings/${id}/status`, { method: 'PATCH', body }),
   messages: (id) => api(`/bookings/${id}/messages`),
   sendMessage: (id, body) => api(`/bookings/${id}/messages`, { method: 'POST', body: { body } }),
@@ -143,7 +150,6 @@ export const customerApi = {
   addFav: (id) => api(`/me/favourites/${id}`, { method: 'POST' }),
   removeFav: (id) => api(`/me/favourites/${id}`, { method: 'DELETE' }),
   addresses: () => api('/me/addresses'),
-  addAddress: (body) => api('/me/addresses', { method: 'POST', body }),
   deleteAddress: (id) => api(`/me/addresses/${id}`, { method: 'DELETE' }),
   emergency: (body) => api('/emergencies', { method: 'POST', body }),
   rentals: (p) => api(`/rentals${qs(p)}`, { auth: false }),
@@ -169,11 +175,17 @@ export const providerApi = {
   subscription: () => api('/provider/subscription'),
   choosePlan: (planId) => api('/provider/subscription', { method: 'POST', body: { planId } }),
   paymentReceived: (id) => api(`/bookings/${id}/payment-received`, { method: 'POST' }),
+  sendPresence: (body) => api('/provider/location', { method: 'POST', body }),
+  presenceStatus: () => api('/provider/location/status'),
 };
 
 /* ---------- admin (own token, own notification feed) ---------- */
 const A = (path, opts = {}) => api(`/admin${path}`, { ...opts, admin: true });
 export const adminApi = {
+  trackingSummary: () => A('/tracking/summary'),
+  trackingSessions: (p = {}) => A(`/tracking/sessions${qs(p)}`),
+  trackingPartners: (p = {}) => A(`/tracking/partners${qs(p)}`),
+  trackingDetail: (bookingId) => A(`/tracking/sessions/${bookingId}`),
   login: (identifier, password) => api('/admin/auth/login', { method: 'POST', body: { identifier, password }, auth: false }),
   verifyWidget: (mfaToken, accessToken) => api('/admin/auth/verify-widget', { method: 'POST', body: { mfaToken, accessToken }, auth: false }),
   verify: (mfaToken, otp) => api('/admin/auth/verify', { method: 'POST', body: { mfaToken, otp }, auth: false }),

@@ -21,7 +21,7 @@ Dono apps `apps/web` ke website code se bante hain; native shell `apps/mobile` m
 ### Location: kaise kaam karti hai
 1. Phone GPS (Capacitor Geolocation) → latitude/longitude. Permission sirf "app use ke waqt".
 2. Backend `GET /api/v1/geo/reverse` → address + sabse paas ka **launched city** (60 km ke andar). Agar aap Dialoo ke city se bahar ho to message aata hai.
-3. Address ke liye free **OpenStreetMap Nominatim** use hota hai (sirf halke use ke liye). **Production me** apna Nominatim server ya LocationIQ/Google jaisa paid provider lagayein: backend env `GEO_NOMINATIM_URL` aur `GEO_USER_AGENT` (apna email daalein). Internet na ho / geocoder band ho to bhi city GPS se mil jati hai, bas street address nahi aata.
+3. Address Google Geocoding se aata hai (server key `GOOGLE_MAPS_SERVER_API_KEY`). Key na ho ya internet na ho to bhi city GPS se mil jati hai, bas street address nahi aata. Map Capacitor WebView me chalta hai, isliye alag Android/iOS Maps SDK ki zarurat nahi.
 4. Providers apni shop ki location "Become a provider" form me save kar sakte hain; location wale providers distance ke saath dikhte hain.
 5. Emulator me location test: Android Studio → emulator ke `⋮` → *Location* → point set karein (Sahaswan ≈ 28.073, 78.753).
 
@@ -93,7 +93,7 @@ Simulator me location: *Features → Location → Custom Location*.
 - **App me "No internet / Network problem"**: dev API URL (`10.0.2.2:8080`), backend chal raha hai?, `FRONTEND_ORIGIN` me `http://localhost` hai?
 - **Release me login nahi**: API https hona chahiye aur `FRONTEND_ORIGIN` me `https://localhost` (Android) / `capacitor://localhost` (iOS).
 - **Location nahi mil rahi**: phone me Location ON, app ko permission; emulator me location point set karein. Header ka 📍 dabakar "Use my current location" dobara try karein.
-- **Address nahi aata par city aati hai**: geocoder (Nominatim) ne rate-limit ya internet issue; production me apna geocoder lagayein.
+- **Address nahi aata par city aati hai**: Google geocoder ka key/quota issue ya internet; `GOOGLE_MAPS_SERVER_API_KEY` aur daily cap check karein.
 - **iOS `Package.swift` plugin path error**: pehle `npm install` chalayein (iOS plugins `node_modules` se aate hain).
 - **Web code badla**: dobara `apps/mobile` se `.\build-android.ps1 ...` / `npm run ios:sync` chalayein (web build + copy automatic).
 - Admin console app me nahi hai (sirf website `/admin`), jaan-boojhkar.

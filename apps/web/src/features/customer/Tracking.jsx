@@ -41,7 +41,7 @@ export default function Tracking({ id }) {
         </div>
       </section>
 
-      {b.status === 'ON_THE_WAY' && <LiveTrack bookingId={b.id} name={b.business_name} phone={b.provider_phone} fallbackEta={b.eta_minutes} />}
+      {b.status === 'ON_THE_WAY' && <LiveTrack booking={b} onChat={() => setChat(true)} onJourneyChange={load} />}
 
       {!failed && (
         <ol className="steps">

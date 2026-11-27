@@ -3,6 +3,10 @@ server:
 spring:
   application:
     name: dialoo-api
+  task:
+    scheduling:
+      pool:
+        size: 4   # shared by @Scheduled jobs and the STOMP heartbeats
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -55,15 +59,47 @@ app:
     allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 
   geo:
-    # Reverse geocoding for "Use my current location". Public Nominatim is for light use only - use your own/paid server in production.
-    nominatim-url: ${GEO_NOMINATIM_URL:https://nominatim.openstreetmap.org}
-    user-agent: ${GEO_USER_AGENT:Dialoo/4.0 (set GEO_USER_AGENT with your contact email)}
+    # Reverse geocoding for "Use my current location" (Google Geocoding API, SERVER key). Without a key the nearest street/locality
+    # stored in our own database is returned, so the app keeps working.
+    geocode-daily-limit: ${GEOCODE_DAILY_LIMIT:5000}
+    geocode-per-ip-per-minute: ${GEOCODE_PER_IP_PER_MINUTE:30}
+
+  maps:
+    # SERVER key only (Routes API + Geocoding API). Restrict by API and, where your host has a fixed egress IP, by IP. Never ship it in web/mobile code.
+    server-api-key: ${GOOGLE_MAPS_SERVER_API_KEY:}
 
   tracking:
-    # Live tracking route + ETA. Free key: https://openrouteservice.org (set ORS_API_KEY; without it a straight-line estimate is used)
-    ors-api-key: ${ORS_API_KEY:}
-    ors-daily-limit: ${ORS_DAILY_LIMIT:1800}
+    # ---- GPS / realtime (all values configurable through environment variables) ----
+    gps-interval-seconds: ${TRACKING_GPS_INTERVAL_SECONDS:10}              # active journey, moving
+    stationary-interval-seconds: ${TRACKING_STATIONARY_INTERVAL_SECONDS:30}
+    min-distance-meters: ${TRACKING_MIN_DISTANCE_METERS:15}                # movement filter on the device
+    persist-interval-seconds: ${TRACKING_PERSIST_INTERVAL_SECONDS:60}      # DB write cadence (live state itself is in memory)
+    stale-warning-seconds: ${TRACKING_STALE_SECONDS:30}
+    unavailable-seconds: ${TRACKING_UNAVAILABLE_SECONDS:90}
+    arrival-radius-meters: ${TRACKING_ARRIVAL_RADIUS_METERS:100}
+    approaching-radius-meters: ${TRACKING_APPROACHING_RADIUS_METERS:500}
+    max-accuracy-meters: ${TRACKING_MAX_ACCURACY_METERS:100}               # fixes worse than this are rejected
+    arrival-max-accuracy-meters: ${TRACKING_ARRIVAL_MAX_ACCURACY_METERS:75}
+    max-speed-mps: ${TRACKING_MAX_SPEED_MPS:45}                            # ~160 km/h: implied speed above this = location jump
+    max-fix-age-seconds: ${TRACKING_MAX_FIX_AGE_SECONDS:120}               # device timestamp older than this = rejected (offline buffer may send older ones in order)
+    max-future-skew-seconds: ${TRACKING_MAX_FUTURE_SKEW_SECONDS:30}
+    min-update-gap-millis: ${TRACKING_MIN_UPDATE_GAP_MILLIS:1500}          # per-booking rate limit
+    session-max-hours: ${TRACKING_SESSION_MAX_HOURS:8}
+    history-retention-days: ${TRACKING_HISTORY_RETENTION_DAYS:7}
+    # ---- Google Routes API ----
+    routes-refresh-seconds: ${TRACKING_ROUTES_REFRESH_SECONDS:300}         # periodic route + ETA refresh
+    routes-min-gap-seconds: ${TRACKING_ROUTES_MIN_GAP_SECONDS:30}          # rate limit for deviation-triggered recalculation
+    route-deviation-meters: ${TRACKING_ROUTE_DEVIATION_METERS:150}
+    routes-daily-limit: ${TRACKING_ROUTES_DAILY_LIMIT:3000}                # hard cap per UTC day, then straight-line estimate
+    routes-travel-mode: ${TRACKING_ROUTES_TRAVEL_MODE:DRIVE}               # DRIVE | TWO_WHEELER
+    routes-preference: ${TRACKING_ROUTES_PREFERENCE:TRAFFIC_UNAWARE}       # TRAFFIC_UNAWARE is the lowest-cost tier; TRAFFIC_AWARE bills at a higher tier
     fallback-speed-kmh: ${TRACKING_FALLBACK_SPEED_KMH:25}
+    # ---- nearby partners ----
+    nearby-default-radius-km: ${NEARBY_DEFAULT_RADIUS_KM:5}
+    nearby-max-radius-km: ${NEARBY_MAX_RADIUS_KM:20}
+    partner-location-fresh-seconds: ${PARTNER_LOCATION_FRESH_SECONDS:300}
+    partner-presence-min-gap-seconds: ${PARTNER_PRESENCE_MIN_GAP_SECONDS:20}
+    autocomplete-debounce-millis: ${AUTOCOMPLETE_DEBOUNCE_MILLIS:400}
 
   sms:
     provider: ${SMS_PROVIDER:log}   # log | twilio | msg91

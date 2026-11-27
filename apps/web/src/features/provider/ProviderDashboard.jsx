@@ -3,7 +3,9 @@ import { catalogApi, providerApi, customerApi } from '../../shared/api.js';
 import { go } from '../../shared/router.js';
 import { Empty, Sheet, Spinner, StatusBadge, dateTime, money, timeAgo, useT, useToast, usePolling } from '../../shared/ui.jsx';
 import { ChatSheet } from '../customer/Tracking.jsx';
-import { useShareLocation } from '../../shared/useShareLocation.js';
+import { useShareLocation, usePartnerPresence } from '../../shared/useShareLocation.js';
+import { getPosition } from '../../shared/native.js';
+import JourneyPanel from './JourneyPanel.jsx';
 import JobSteps from './JobSteps.jsx';
 import { Ban, Banknote, CalendarClock, CarFront, CircleCheck, HardHat, Hourglass, Inbox, LockKeyhole, MapPin, MessageCircle, PartyPopper, Phone, Play, Star, Zap } from 'lucide-react';
 
@@ -56,7 +58,11 @@ export default function ProviderDashboard({ user, onNeedLogin }) {
   };
   useEffect(() => { if (user) { load(); catalogApi.plans().then(setPlans); providerApi.subscription().then(setSub).catch(() => {}); } }, [user]); // eslint-disable-line
   usePolling(load, 8000, [user], !!user && me?.status === 'APPROVED');
-  const sharing = useShareLocation(me?.status === 'APPROVED' ? rows.filter((r) => r.status === 'ON_THE_WAY').map((r) => r.id) : []);
+  const [arrivedIds, setArrivedIds] = useState([]); const [epoch, setEpoch] = useState(0);
+  const journeyIds = me?.status === 'APPROVED' ? rows.filter((r) => r.status === 'ON_THE_WAY' && !arrivedIds.includes(r.id)).map((r) => r.id) : [];
+  const sharing = useShareLocation(journeyIds, epoch);
+  // Online without a journey: low-frequency position for nearby discovery. Stops the moment the partner goes offline.
+  const presence = usePartnerPresence(me?.status === 'APPROVED' && !!sum?.available_now);
 
   if (!user) return <Empty icon={<LockKeyhole size={26} aria-hidden="true" />} title={t('Sign in to open your dashboard', 'डैशबोर्ड के लिए साइन इन करें')} action={<button className="btn primary" onClick={onNeedLogin}>{t('Sign in', 'साइन इन')}</button>} />;
   if (me === undefined) return <Spinner />;
@@ -65,6 +71,12 @@ export default function ProviderDashboard({ user, onNeedLogin }) {
 
   const act = async (fn, okMsg) => { try { await fn(); toast(okMsg, 'ok'); load(); } catch (e) { toast(e.message, 'err'); } };
   const setStatus = (id, body, msg) => act(() => customerApi.setStatus(id, body), msg);
+  // Starting a journey: first make sure we really can read the location (this also triggers the permission prompt), then change the status.
+  const startJourney = async (r) => {
+    try { await getPosition(10000, 5000); }
+    catch (e) { return toast(e.code === 'DENIED' ? t('Allow location for Dialoo first. The consumer tracks your arrival with it.', 'पहले Dialoo को लोकेशन की अनुमति दें। कंज़्यूमर इसी से आपको ट्रैक करता है।') : t('Could not read your GPS. Turn on location and try again.', 'GPS नहीं मिला। लोकेशन चालू करके फिर कोशिश करें।'), 'err'); }
+    setStatus(r.id, { status: 'ON_THE_WAY' }, t('Marked on the way', 'रास्ते में'));
+  };
   const groups = { new: rows.filter((r) => r.status === 'REQUESTED'), active: rows.filter((r) => ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(r.status)), done: rows.filter((r) => !['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(r.status)) };
   const list = groups[tab];
 
@@ -76,11 +88,13 @@ export default function ProviderDashboard({ user, onNeedLogin }) {
       </div>
       {sharing.status !== 'idle' && (
         <div className={`share-banner ${sharing.status}`} role="status">
-          {sharing.status === 'live' && <><span className="dot" aria-hidden="true" />{t('Live location is being shared with the consumer until you start the work.', 'काम शुरू करने तक आपकी लाइव लोकेशन कंज़्यूमर को दिख रही है।')}</>}
+          {sharing.status === 'live' && <><span className="dot" aria-hidden="true" />{t('Your live location is shared only with the consumer of this booking, until you arrive. It stops automatically.', 'आपकी लाइव लोकेशन सिर्फ़ इस बुकिंग के कंज़्यूमर को, पहुँचने तक दिखती है। यह अपने आप बंद हो जाती है।')}{sharing.background ? ` ${t('Keeps working when the screen is locked.', 'स्क्रीन लॉक होने पर भी चलती है।')}` : ` ${t('Keep the app open for live updates.', 'लाइव अपडेट के लिए ऐप खुला रखें।')}`}</>}
           {sharing.status === 'denied' && <>{t('Location permission is off. Allow location for Dialoo so the consumer can track you.', 'लोकेशन की अनुमति बंद है। कंज़्यूमर के ट्रैक करने के लिए Dialoo को लोकेशन की अनुमति दें।')}</>}
           {sharing.status === 'error' && <>{t('Could not send your location. Keep the app open and GPS on.', 'आपकी लोकेशन नहीं भेज सके। ऐप खुला और GPS चालू रखें।')}</>}
         </div>
       )}
+      {sharing.status === 'idle' && presence.status === 'sharing' && <div className="share-banner live" role="status"><span className="dot" aria-hidden="true" />{t('You are online. Your area is shared with Dialoo only to match nearby requests; exact position is never shown to consumers. Go offline to stop.', 'आप ऑनलाइन हैं। आपका इलाका सिर्फ़ पास की रिक्वेस्ट मिलाने के लिए Dialoo के पास है; कंज़्यूमर को सटीक लोकेशन नहीं दिखती। रोकने के लिए ऑफ़लाइन हों।')}</div>}
+      {sharing.status === 'idle' && presence.status === 'denied' && <div className="share-banner denied" role="status">{t('Location is off, so you will not appear in nearby searches. Allow location for Dialoo.', 'लोकेशन बंद है, इसलिए आप पास की खोज में नहीं दिखेंगे। Dialoo को लोकेशन की अनुमति दें।')}</div>}
       {sum && <div className="kpis">
         <div className="kpi hot"><span>{t('New requests', 'नई रिक्वेस्ट')}</span><b>{sum.new_requests}</b></div><div className="kpi"><span>{t('Active jobs', 'चालू काम')}</span><b>{sum.active_jobs}</b></div>
         <div className="kpi"><span>{t("Today's earnings", 'आज की कमाई')}</span><b>{money(sum.earnings_today)}</b></div><div className="kpi"><span>{t('Total earned', 'कुल कमाई')}</span><b>{money(sum.earnings_total)}</b></div>
@@ -95,9 +109,10 @@ export default function ProviderDashboard({ user, onNeedLogin }) {
           {r.description && <p className="muted">“{r.description}”</p>}
           <p className="muted small">{r.scheduled_at ? <><CalendarClock size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {dateTime(r.scheduled_at)}</> : <><Zap size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('ASAP', 'तुरंत')}</>} · {timeAgo(r.created_at)}</p>
           <JobSteps status={r.status} paid={r.payment_status === 'PAID'} />
+          {r.status === 'ON_THE_WAY' && <JourneyPanel booking={r} share={sharing} onArrived={() => { setArrivedIds((a) => (a.includes(r.id) ? a : [...a, r.id])); load(); }} onResume={() => setEpoch((e) => e + 1)} />}
           <div className="row gap wrap">
             {r.status === 'REQUESTED' && <><button className="btn primary sm" onClick={() => setStatus(r.id, { status: 'ACCEPTED' }, t('Booking accepted', 'बुकिंग स्वीकार'))}>{t('Accept', 'स्वीकार')}</button><button className="btn danger-outline sm" onClick={() => setRejectFor(r)}>{t('Reject', 'अस्वीकार')}</button></>}
-            {r.status === 'ACCEPTED' && <button className="btn primary sm" onClick={() => setStatus(r.id, { status: 'ON_THE_WAY' }, t('Marked on the way', 'रास्ते में'))}><CarFront size={16} aria-hidden="true" />{t('I am on the way', 'मैं निकल गया')}</button>}
+            {r.status === 'ACCEPTED' && <button className="btn primary sm" onClick={() => startJourney(r)}><CarFront size={16} aria-hidden="true" />{t('I am on the way', 'मैं निकल गया')}</button>}
             {r.status === 'ON_THE_WAY' && <button className="btn primary sm" onClick={() => setStartFor(r)}><Play size={16} aria-hidden="true" />{t('Start work (enter code)', 'काम शुरू (कोड डालें)')}</button>}
             {r.status === 'IN_PROGRESS' && <button className="btn primary sm" onClick={() => setDoneFor(r)}><CircleCheck size={16} aria-hidden="true" />{t('Complete job', 'काम पूरा करें')}</button>}
             {r.status === 'COMPLETED' && r.payment_status !== 'PAID' && <button className="btn outline sm" onClick={() => act(() => providerApi.paymentReceived(r.id), t('Payment recorded', 'भुगतान दर्ज'))}><Banknote size={16} aria-hidden="true" />{t('Mark paid', 'भुगतान मिला')}</button>}

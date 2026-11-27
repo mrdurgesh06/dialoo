@@ -30,11 +30,11 @@ public class BookingService {
   public record CreateRequest(long providerId, Long serviceId, String serviceAddress, String description, String scheduledAt,
                               String urgency, String couponCode, String contactName, String contactPhone, Double latitude, Double longitude) {}
 
-  private final JdbcTemplate db; private final Sql sql; private final NotificationService notify; private final PricingService pricing; private final SettingsService settings; private final TrackingService routes;
+  private final JdbcTemplate db; private final Sql sql; private final NotificationService notify; private final PricingService pricing; private final SettingsService settings; private final TrackingService routes; private final com.narayanix.dialoo.tracking.TrackingSessionService journeys;
   private final SecureRandom random = new SecureRandom();
 
-  public BookingService(JdbcTemplate db, Sql sql, NotificationService notify, PricingService pricing, SettingsService settings, TrackingService routes) {
-    this.routes = routes; this.db = db; this.sql = sql; this.notify = notify; this.pricing = pricing; this.settings = settings;
+  public BookingService(JdbcTemplate db, Sql sql, NotificationService notify, PricingService pricing, SettingsService settings, TrackingService routes, com.narayanix.dialoo.tracking.TrackingSessionService journeys) {
+    this.routes = routes; this.journeys = journeys; this.db = db; this.sql = sql; this.notify = notify; this.pricing = pricing; this.settings = settings;
   }
 
   @Transactional
@@ -121,7 +121,10 @@ public class BookingService {
     if (n == 0) throw new IllegalArgumentException("This booking was just updated by someone else. Please refresh and try again.");
     db.update("INSERT INTO booking_status_history(booking_id,from_status,to_status,changed_by,actor_role,reason) VALUES(?,?,?,?,?,?)", bookingId, from, to, actorUserId, actorRole, blank(reason) ? null : reason.trim());
 
-    if (!to.equals("ON_THE_WAY")) { db.update("DELETE FROM booking_tracking WHERE booking_id=?", bookingId); routes.forget(bookingId); } // privacy: location lives only while on the way
+    // Journey lifecycle follows the booking status. ON_THE_WAY creates (or resumes) the tracking session; any other status ends it,
+    // deletes the stored position and tells subscribers (cancelled / started / completed / reassigned ...). Both calls are idempotent.
+    if (to.equals("ON_THE_WAY")) journeys.start(bookingId);
+    else journeys.end(bookingId, switch (to) { case "IN_PROGRESS" -> "SERVICE_STARTED"; case "COMPLETED" -> "COMPLETED"; case "CANCELLED", "REJECTED" -> "CANCELLED"; default -> "BOOKING_" + to; });
     String code = (String) b.get("booking_code"); String biz = (String) b.get("business_name");
     if (to.equals("COMPLETED")) completeSideEffects(bookingId, ((Number) b.get("provider_id")).longValue(), finalAmount);
 

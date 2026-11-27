@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import com.narayanix.dialoo.tracking.MapsUsageMeter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,27 +31,26 @@ import org.springframework.web.bind.annotation.RestController;
  * "Use my current location": GPS coordinates -> readable address + nearest launched city (Uber / Rapido style).
  * Public (guests can use it), rate-limited per IP, results cached. If the geocoder is unreachable we still return the
  * nearest city from our own database, so the app keeps working.
- * Production note: the free OpenStreetMap Nominatim server is for light use only. Point GEO_NOMINATIM_URL at your own
- * Nominatim / LocationIQ / similar provider before you have real traffic.
+ * Reverse geocoding uses the Google Geocoding API with the SERVER key (GOOGLE_MAPS_SERVER_API_KEY), a daily cap and a database fallback.
+ *
  */
 @RestController @RequestMapping("/api/v1/geo")
 public class GeoController {
   private static final Logger log = LoggerFactory.getLogger(GeoController.class);
-  private static final int MAX_PER_MINUTE = 30;
   private static final int SERVICEABLE_KM = 60;
 
-  private final JdbcTemplate db; private final ObjectMapper json;
-  private final String baseUrl; private final String userAgent;
-  private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
+  private final JdbcTemplate db; private final ObjectMapper json; private final MapsUsageMeter meter;
+  private final String apiKey; private final int dailyLimit; private final int perMinute;
+  private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
   private final Map<String, Deque<Long>> hits = new ConcurrentHashMap<>();
-  private final Map<String, Map<String, Object>> cache = java.util.Collections.synchronizedMap(new LinkedHashMap<>(256, 0.75f, true) {
-    @Override protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> e) { return size() > 2000; }
+  // Short in-memory cache (~110 m grid, 1 h) only to absorb repeated taps; nothing from Google is written to the database.
+  private final Map<String, Object[]> cache = java.util.Collections.synchronizedMap(new LinkedHashMap<>(256, 0.75f, true) {
+    @Override protected boolean removeEldestEntry(Map.Entry<String, Object[]> e) { return size() > 2000; }
   });
 
-  public GeoController(JdbcTemplate db, ObjectMapper json,
-                       @Value("${app.geo.nominatim-url:https://nominatim.openstreetmap.org}") String baseUrl,
-                       @Value("${app.geo.user-agent:Dialoo/4.0 (set GEO_USER_AGENT with your contact email)}") String userAgent) {
-    this.db = db; this.json = json; this.baseUrl = baseUrl.replaceAll("/+$", ""); this.userAgent = userAgent;
+  public GeoController(JdbcTemplate db, ObjectMapper json, MapsUsageMeter meter, @Value("${app.maps.server-api-key:}") String apiKey,
+                       @Value("${app.geo.geocode-daily-limit:5000}") int dailyLimit, @Value("${app.geo.geocode-per-ip-per-minute:30}") int perMinute) {
+    this.db = db; this.json = json; this.meter = meter; this.apiKey = apiKey == null ? "" : apiKey.trim(); this.dailyLimit = dailyLimit; this.perMinute = perMinute;
   }
 
   @GetMapping("/reverse")
@@ -63,8 +63,9 @@ public class GeoController {
     addNearestCity(out, lat, lng);
 
     String key = String.format(Locale.ROOT, "%.3f,%.3f", lat, lng);          // ~110 m grid
-    Map<String, Object> place = cache.get(key);
-    if (place == null) { place = lookup(lat, lng); if (place != null) cache.put(key, place); }
+    Object[] hit = cache.get(key);
+    Map<String, Object> place = hit != null && System.currentTimeMillis() - (Long) hit[0] < 3_600_000 ? castMap(hit[1]) : null;
+    if (place == null) { place = lookup(lat, lng); if (place != null) cache.put(key, new Object[]{System.currentTimeMillis(), place}); }
     if (place != null) { out.putAll(place); out.put("source", "MAP"); }
     else {
       Map<String, Object> local = nearestKnownPlace(lat, lng);   // our own street / area table
@@ -107,36 +108,43 @@ public class GeoController {
     return null;
   }
 
+  @SuppressWarnings("unchecked") private static Map<String, Object> castMap(Object o) { return (Map<String, Object>) o; }
+
+  /** Google Geocoding API (reverse). Returns null when no key is set, the daily cap is used up or the call fails: the caller then uses our own database. */
   private Map<String, Object> lookup(double lat, double lng) {
+    if (apiKey.isBlank() || !meter.tryAcquire("GEOCODING", dailyLimit)) return null;
     try {
-      String url = baseUrl + "/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=en&lat=" + lat + "&lon=" + lng;
-      HttpRequest r = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(5)).header("User-Agent", userAgent).header("Accept", "application/json").GET().build();
+      String url = "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + lat + "," + lng + "&language=en&region=in&result_type=street_address%7Croute%7Csublocality%7Clocality&key=" + apiKey;
+      HttpRequest r = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(4)).header("Accept", "application/json").GET().build();
       HttpResponse<String> resp = http.send(r, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-      if (resp.statusCode() != 200) { log.warn("Geocoder returned HTTP {}", resp.statusCode()); return null; }
-      JsonNode root = json.readTree(resp.body()); JsonNode a = root.path("address");
-      String road = join(a.path("house_number").asText(""), first(a, "road", "pedestrian", "footway", "path"));
-      String area = first(a, "suburb", "neighbourhood", "quarter", "residential", "hamlet");
-      String town = first(a, "city", "town", "village", "municipality", "county");
-      StringBuilder addr = new StringBuilder();
-      for (String part : new String[]{road, area, town, first(a, "state_district"), first(a, "state")}) {
-        if (part == null || part.isBlank() || addr.toString().contains(part)) continue;
-        if (addr.length() > 0) addr.append(", ");
-        addr.append(part);
-      }
-      String pin = a.path("postcode").asText("");
-      if (!pin.isBlank()) addr.append(" - ").append(pin);
+      if (resp.statusCode() != 200) { meter.failed("GEOCODING"); log.warn("Geocoder returned HTTP {}", resp.statusCode()); return null; }
+      JsonNode root = json.readTree(resp.body());
+      String st = root.path("status").asText("");
+      if (!st.equals("OK")) { if (!st.equals("ZERO_RESULTS")) { meter.failed("GEOCODING"); log.warn("Geocoder status {}", st); } return null; }
+      JsonNode best = root.path("results").path(0);
+      Map<String, String> c = new LinkedHashMap<>();
+      for (JsonNode comp : best.path("address_components")) for (JsonNode t : comp.path("types")) c.putIfAbsent(t.asText(), comp.path("long_name").asText(""));
+      String locality = firstOf(c, "sublocality_level_1", "sublocality", "neighborhood", "locality");
       Map<String, Object> p = new LinkedHashMap<>();
-      p.put("address", addr.length() == 0 ? root.path("display_name").asText(null) : addr.toString());
-      p.put("locality", area.isBlank() ? town : area);
+      p.put("address", best.path("formatted_address").asText(null));
+      p.put("locality", locality.isBlank() ? null : locality);
+      String pin = c.getOrDefault("postal_code", "");
       p.put("pincode", pin.isBlank() ? null : pin);
+      p.put("city", firstOf(c, "locality", "administrative_area_level_2"));
+      p.put("district", c.getOrDefault("administrative_area_level_2", ""));
+      p.put("state", c.getOrDefault("administrative_area_level_1", ""));
+      p.put("country", c.getOrDefault("country", ""));
+      p.put("placeId", best.path("place_id").asText(null));
       return p;
     } catch (Exception e) {
-      log.warn("Reverse geocoding failed: {}", e.getMessage());
+      meter.failed("GEOCODING");
+      log.warn("Reverse geocoding failed: {}", e.getClass().getSimpleName());
       if (e instanceof InterruptedException) Thread.currentThread().interrupt();
       return null;
     }
   }
 
+  private static String firstOf(Map<String, String> c, String... keys) { for (String k : keys) { String v = c.get(k); if (v != null && !v.isBlank()) return v; } return ""; }
   private static String first(JsonNode a, String... keys) { for (String k : keys) { String v = a.path(k).asText(""); if (!v.isBlank()) return v; } return ""; }
   private static String join(String a, String b) { return (a.isBlank() ? "" : a + " ") + b; }
 
@@ -145,7 +153,7 @@ public class GeoController {
     Deque<Long> q = hits.computeIfAbsent(ip == null ? "?" : ip, k -> new ArrayDeque<>());
     synchronized (q) {
       while (!q.isEmpty() && now - q.peekFirst() > 60_000) q.pollFirst();
-      if (q.size() >= MAX_PER_MINUTE) throw new com.narayanix.dialoo.service.TooManyRequestsException("Too many location requests. Please wait a minute.", 60);
+      if (q.size() >= perMinute) throw new com.narayanix.dialoo.service.TooManyRequestsException("Too many location requests. Please wait a minute.", 60);
       q.addLast(now);
     }
     if (hits.size() > 5000) hits.entrySet().removeIf(e -> e.getValue().isEmpty());
