@@ -59,7 +59,7 @@ export default function TrackMap({ dest, provider, route, gpsMs = 10000, stale =
   // ---- route line ----
   useEffect(() => {
     const s = st.current; if (!ready) return;
-    const path = (route || []).map(([lat, lng]) => ({ lat, lng }));
+    const path = (Array.isArray(route) ? route : []).map(([lat, lng]) => ({ lat, lng }));
     if (path.length < 2) { if (s.line) { s.line.setMap(null); s.line = null; } return; }
     if (!s.line) s.line = new s.Polyline({ map: s.map, path, strokeColor: '#F47A16', strokeOpacity: 0.95, strokeWeight: 5, geodesic: true });
     else s.line.setPath(path);

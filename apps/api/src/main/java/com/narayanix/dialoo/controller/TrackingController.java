@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
  *   POST /bookings/{id}/tracking/location   partner GPS fix (HTTPS fallback)
  *   POST /bookings/{id}/tracking/start      create or resume the tracking session (idempotent)
  *   GET  /bookings/{id}/tracking            full state for the customer / partner screen (restores state after a reconnect)
- *   POST /bookings/{id}/tracking/arrive     partner confirms arrival (geofence checked on the server, idempotent)
+ *   POST /bookings/{id}/tracking/arrive     partner confirms arrival (geofence checked on the server; ?manual=true skips the geofence and is recorded as ARRIVED_MANUAL; idempotent)
  *   POST /bookings/{id}/tracking/stop       partner stops sharing; the booking itself is untouched (idempotent)
  *   GET  /tracking/config                   client-side tunables (intervals, radii, debounce)
  */
@@ -56,7 +56,7 @@ public class TrackingController {
   }
 
   @PostMapping("/bookings/{id}/tracking/arrive")
-  public Map<String, Object> arrive(@PathVariable long id, Authentication a) { requirePartner(a); return sessions.arrive(id, me.id(a)); }
+  public Map<String, Object> arrive(@PathVariable long id, @RequestParam(defaultValue = "false") boolean manual, Authentication a) { requirePartner(a); return sessions.arrive(id, me.id(a), manual); }
 
   @PostMapping("/bookings/{id}/tracking/stop")
   public Map<String, Object> stop(@PathVariable long id, Authentication a) { requirePartner(a); sessions.stop(id, me.id(a), false); return Map.of("stopped", true); }

@@ -27,6 +27,7 @@ export default function LiveTrack({ booking, onChat, onJourneyChange }) {
   if (f.arrived) state = 'ARRIVED';
   else if (f.ended) state = 'ENDED';
   else if (f.journey === 'NOT_STARTED') state = 'NOT_STARTED';
+  else if (f.reached) state = 'REACHED';
   else if (!f.provider) state = 'WAITING';
   else if (f.connection === 'UNAVAILABLE') state = 'UNAVAILABLE';
   else if (f.connection === 'STALE') state = 'STALE';
@@ -38,14 +39,15 @@ export default function LiveTrack({ booking, onChat, onJourneyChange }) {
     LIVE: [t('Your Dialoo Partner is on the way', 'आपका Dialoo पार्टनर रास्ते में है'), eta != null ? `${t('Arriving in approximately', 'लगभग')} ${estimate ? '~' : ''}${eta} ${t('minutes', 'मिनट में पहुँचेंगे')}` : t('Calculating arrival time…', 'पहुँचने का समय निकाल रहे हैं…')],
     STALE: [t('Your Dialoo Partner is on the way', 'आपका Dialoo पार्टनर रास्ते में है'), t('Location is updating slowly — showing the last known position.', 'लोकेशन धीरे अपडेट हो रही है — आख़िरी पता दिख रहा है।')],
     UNAVAILABLE: [t('Live location is temporarily unavailable', 'लाइव लोकेशन अभी उपलब्ध नहीं'), t('Showing the last known position. Your partner is still on the way.', 'आख़िरी पता दिख रहा है। आपका पार्टनर रास्ते में ही है।')],
+    REACHED: [t('Your Dialoo Partner has reached your location', 'आपका Dialoo पार्टनर आपकी लोकेशन पर पहुँच गया है'), t('They will confirm their arrival in a moment. Keep your 4-digit start code ready.', 'वे अभी अपना पहुँचना कन्फ़र्म करेंगे। 4 अंकों का स्टार्ट कोड तैयार रखें।')],
     ARRIVED: [t('Your Dialoo Partner has arrived', 'आपका Dialoo पार्टनर पहुँच गया है'), t('Share your 4-digit start code to begin the work.', 'काम शुरू करने के लिए 4 अंकों का स्टार्ट कोड बताएँ।')],
     ENDED: [t('Live tracking has stopped', 'लाइव ट्रैकिंग बंद हो गई'), t('Your partner may still be on the way. Call them if needed.', 'पार्टनर अभी भी रास्ते में हो सकते हैं। ज़रूरत हो तो कॉल करें।')],
   }[state];
 
-  const showMap = ['LIVE', 'STALE', 'UNAVAILABLE', 'WAITING', 'NOT_STARTED'].includes(state) || (state === 'ARRIVED' && dest);
+  const showMap = ['LIVE', 'STALE', 'UNAVAILABLE', 'WAITING', 'NOT_STARTED', 'REACHED'].includes(state) || (state === 'ARRIVED' && dest);
   return (
     <section className="trk-card" aria-label={t('Live tracking', 'लाइव ट्रैकिंग')}>
-      {showMap && <TrackMap dest={dest} provider={state === 'ARRIVED' ? null : f.provider} route={state === 'LIVE' || state === 'STALE' ? f.route : null} gpsMs={gpsMs} stale={state === 'STALE' || state === 'UNAVAILABLE'} />}
+      {showMap && <TrackMap dest={dest} provider={state === 'ARRIVED' ? null : f.provider} route={state === 'LIVE' || state === 'STALE' || state === 'REACHED' ? f.route : null} gpsMs={gpsMs} stale={state === 'STALE' || state === 'UNAVAILABLE'} />}
 
       <div className="trk-badges">
         <span className={`trk-link ${f.link}`}>{f.link === 'ws' ? <><i className="dot" />{t('Live', 'लाइव')}</> : f.link === 'poll' ? <>{t('Updating every few seconds', 'कुछ सेकंड में अपडेट')}</> : <><WifiOff size={13} aria-hidden="true" />{t('Reconnecting…', 'दोबारा जुड़ रहे हैं…')}</>}</span>

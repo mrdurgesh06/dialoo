@@ -17,6 +17,7 @@ export function useTrackingFeed(bookingId, { enabled = true, pollMs = 6000, onJo
   const [live, setLive] = useState(null);          // latest location event: {lat,lng,heading,speed,ts,seq}
   const [routeEv, setRouteEv] = useState(null);    // latest route event
   const [link, setLink] = useState('connecting');
+  const [reached, setReached] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [error, setError] = useState(null);
   const seqRef = useRef(0); const cb = useRef(onJourneyChange); cb.current = onJourneyChange;
@@ -25,7 +26,7 @@ export function useTrackingFeed(bookingId, { enabled = true, pollMs = 6000, onJo
   fetchSnap.current = async () => {
     try {
       const s = await customerApi.tracking(bookingId);
-      setSnap(s); setError(null);
+      setSnap(s); setError(null); if (s.reached) setReached(true);
       if (s.provider && s.provider.seq > seqRef.current) { seqRef.current = s.provider.seq; setLive({ lat: s.provider.lat, lng: s.provider.lng, heading: s.provider.heading, speed: s.provider.speed, ts: s.provider.updatedAt, seq: s.provider.seq }); }
       if (s.route) setRouteEv({ route: s.route, remainingMeters: s.remainingMeters, etaMinutes: s.etaMinutes, etaSeconds: s.etaSeconds });
       return s;
@@ -34,7 +35,7 @@ export function useTrackingFeed(bookingId, { enabled = true, pollMs = 6000, onJo
 
   useEffect(() => {
     if (!enabled || !bookingId) return undefined;
-    seqRef.current = 0; setLive(null); setRouteEv(null); setSnap(null);
+    seqRef.current = 0; setLive(null); setRouteEv(null); setSnap(null); setReached(false);
     let dead = false; let unsub = null;
     fetchSnap.current();
     const handle = acquireStomp((s) => { if (dead) return; setLink(s === 'connected' ? 'ws' : s === 'connecting' ? 'connecting' : 'reconnecting'); if (s === 'connected') fetchSnap.current(); });
@@ -45,6 +46,8 @@ export function useTrackingFeed(bookingId, { enabled = true, pollMs = 6000, onJo
         seqRef.current = m.seq;
         setLive({ lat: m.lat, lng: m.lng, heading: m.heading, speed: m.speed, ts: m.ts, seq: m.seq });
         if (m.remainingMeters != null) setRouteEv((r) => ({ route: r ? r.route : null, remainingMeters: m.remainingMeters, etaMinutes: m.etaMinutes, etaSeconds: m.etaSeconds }));
+      } else if (m.type === 'reached') {
+        setReached(true);
       } else if (m.type === 'route') {
         setRouteEv({ route: m.route, remainingMeters: m.remainingMeters, etaMinutes: m.etaMinutes, etaSeconds: m.etaSeconds });
       } else if (m.type === 'arrived' || m.type === 'ended' || m.type === 'started') {
@@ -70,8 +73,8 @@ export function useTrackingFeed(bookingId, { enabled = true, pollMs = 6000, onJo
   let connection = 'WAITING';
   if (ageSeconds != null) connection = ageSeconds > cfg.unavailableSeconds ? 'UNAVAILABLE' : ageSeconds > cfg.staleWarningSeconds ? 'STALE' : 'LIVE';
   return {
-    snap, journey, provider: live, route: routeEv ? routeEv.route : null, remainingMeters: routeEv ? routeEv.remainingMeters : null,
+    snap, journey, provider: live, route: routeEv && routeEv.route ? routeEv.route.coordinates : null, remainingMeters: routeEv ? routeEv.remainingMeters : null,
     etaMinutes: routeEv ? routeEv.etaMinutes : null, link: wsUp ? 'ws' : link === 'connecting' ? 'connecting' : (error ? 'poll-error' : 'poll'),
-    connection, ageSeconds, arrived: journey === 'ARRIVED' || !!(snap && snap.arrived), ended: journey === 'ENDED', error, refresh: () => fetchSnap.current(), cfg,
+    connection, ageSeconds, reached, arrived: journey === 'ARRIVED' || !!(snap && snap.arrived), ended: journey === 'ENDED', error, refresh: () => fetchSnap.current(), cfg,
   };
 }

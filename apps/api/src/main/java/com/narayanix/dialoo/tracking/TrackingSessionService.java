@@ -44,7 +44,7 @@ public class TrackingSessionService {
     final Journey j;
     volatile LocationGuard.Fix last;
     volatile long lastAcceptedMs, lastPersistMs;
-    volatile boolean approachNotified;
+    volatile boolean approachNotified, reachedNotified;
     final AtomicBoolean routing = new AtomicBoolean();
     Live(Journey j) { this.j = j; }
   }
@@ -93,7 +93,7 @@ public class TrackingSessionService {
   }
 
   /** Partner confirms arrival. Needs a fresh, accurate fix inside the arrival radius. Never completes the service. Idempotent. */
-  public Map<String, Object> arrive(long bookingId, long userId) {
+  public Map<String, Object> arrive(long bookingId, long userId, boolean manual) {
     Live rt = runtime(bookingId);
     if (rt == null) {
       Map<String, Object> s = latestSession(bookingId);
@@ -103,13 +103,13 @@ public class TrackingSessionService {
     if (rt.j.providerUserId() != userId) throw new IllegalArgumentException("Booking not found or access denied");
     LocationGuard.Fix f = rt.last != null ? rt.last : store.get(bookingId);
     Double dist = null;
-    if (rt.j.destLat() != null && rt.j.destLng() != null) {
+    if (!manual && rt.j.destLat() != null && rt.j.destLng() != null) {
       if (f == null || System.currentTimeMillis() - f.serverTs() > cfg.getUnavailableSeconds() * 1000L) throw new IllegalArgumentException("Waiting for a fresh GPS location. Check that location is on and try again.");
       if (f.accuracy() != null && f.accuracy() > cfg.getArrivalMaxAccuracyMeters()) throw new IllegalArgumentException("GPS accuracy is too low (" + Math.round(f.accuracy()) + " m). Move to an open area and try again.");
       dist = RouteMath.haversine(f.lat(), f.lng(), rt.j.destLat(), rt.j.destLng());
       if (dist > cfg.getArrivalRadiusMeters()) throw new IllegalArgumentException("You are still about " + Math.round(dist) + " m away. You can confirm arrival within " + Math.round(cfg.getArrivalRadiusMeters()) + " m of the address.");
     }
-    int n = db.update("UPDATE tracking_sessions SET status='ARRIVED', arrived_at=UTC_TIMESTAMP(), ended_at=UTC_TIMESTAMP(), end_reason='ARRIVED' WHERE id=? AND status='ACTIVE'", rt.j.sessionId());
+    int n = db.update("UPDATE tracking_sessions SET status='ARRIVED', arrived_at=UTC_TIMESTAMP(), ended_at=UTC_TIMESTAMP(), end_reason=? WHERE id=? AND status='ACTIVE'", manual ? "ARRIVED_MANUAL" : "ARRIVED", rt.j.sessionId());
     if (n == 0) return arrivedResponse(true, dist);
     db.update("DELETE FROM booking_tracking WHERE booking_id=?", bookingId);   // journey tracking stops here
     forgetRuntime(bookingId);
@@ -187,6 +187,14 @@ public class TrackingSessionService {
           notify.toUser(rt.j.customerId(), "PROVIDER_APPROACHING", "Your Dialoo Partner is almost there", rt.j.providerName() + " is about to reach your address (" + rt.j.bookingCode() + ").", "BOOKING", id, "USER", "NORMAL");
         } catch (RuntimeException e) { log.warn("Approach notification failed: {}", e.getMessage()); }
       }
+      // Automatic "reached" message: the partner is inside the arrival radius with a trustworthy fix. The partner still confirms arrival
+      // (or confirms manually); nothing is completed automatically.
+      if (!rt.reachedNotified && dist <= cfg.getArrivalRadiusMeters() && (f.accuracy() == null || f.accuracy() <= cfg.getArrivalMaxAccuracyMeters())) {
+        rt.reachedNotified = true;
+        broadcast(id, event("reached", rt.j.sessionId()));
+        try { notify.toUser(rt.j.customerId(), "PROVIDER_REACHED", "Your Dialoo Partner has reached your location", rt.j.providerName() + " is at your address (" + rt.j.bookingCode() + "). Keep your start code ready.", "BOOKING", id, "USER", "HIGH"); }
+        catch (RuntimeException e) { log.warn("Reached notification failed: {}", e.getMessage()); }
+      }
       if (routes.due(id, f.lat(), f.lng(), rt.j.destLat(), rt.j.destLng(), now) && rt.routing.compareAndSet(false, true)) {
         double lat = f.lat(), lng = f.lng(), dLat = rt.j.destLat(), dLng = rt.j.destLng();
         try {
@@ -247,6 +255,7 @@ public class TrackingSessionService {
     j.put("state", state); j.put("sessionId", sess == null ? null : sess.get("id")); j.put("endReason", sess == null ? null : sess.get("end_reason"));
     j.put("lastSeq", sess == null ? 0 : sess.get("last_seq"));
     out.put("journey", j);
+    { Live lv = live.get(bookingId); out.put("reached", lv != null && lv.reachedNotified); }
     if (!liveBooking) return out;
 
     Double dlat = num(r.get("dlat")), dlng = num(r.get("dlng"));

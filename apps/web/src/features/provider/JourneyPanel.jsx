@@ -25,9 +25,10 @@ export default function JourneyPanel({ booking, share, onArrived, onResume }) {
   const within = mine.within || f.snap?.withinArrivalRadius || false;
   const radius = f.cfg.arrivalRadiusMeters || 100;
 
-  const arrive = async () => {
+  const arrive = async (manual = false) => {
+    if (manual && !window.confirm(t('Confirm only if you are really at the customer\'s address. Your GPS does not match yet, so this will be recorded as a manual confirmation.', 'सिर्फ़ तभी दबाएँ जब आप सच में कस्टमर के पते पर हों। आपका GPS अभी मैच नहीं हो रहा, इसलिए यह मैन्युअल कन्फ़र्मेशन के रूप में दर्ज होगा।'))) return;
     setBusy(true);
-    try { await customerApi.trackingArrive(booking.id); toast(t('Arrival confirmed. Ask the consumer for the start code.', 'पहुँचना दर्ज। कंज़्यूमर से स्टार्ट कोड माँगें।'), 'ok'); onArrived?.(); }
+    try { await customerApi.trackingArrive(booking.id, manual); toast(t('Arrival confirmed. Ask the consumer for the start code.', 'पहुँचना दर्ज। कंज़्यूमर से स्टार्ट कोड माँगें।'), 'ok'); onArrived?.(); }
     catch (e) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
   const stop = async () => { try { await customerApi.trackingStop(booking.id); toast(t('Location sharing stopped for this job.', 'इस काम के लिए लोकेशन शेयरिंग बंद।'), 'info'); } catch (e) { toast(e.message, 'err'); } };
@@ -35,7 +36,7 @@ export default function JourneyPanel({ booking, share, onArrived, onResume }) {
 
   return (
     <div className="journey">
-      {!arrived && <TrackMap dest={dest} provider={f.provider} route={f.route} gpsMs={(f.cfg.gpsIntervalSeconds || 10) * 1000} stale={f.connection !== 'LIVE'} height="220px" />}
+      {!arrived && <TrackMap dest={dest} provider={f.provider || share.lastFix} route={f.route} gpsMs={(f.cfg.gpsIntervalSeconds || 10) * 1000} stale={f.connection !== 'LIVE'} height="220px" />}
       <div className="jr-stats">
         <div><small>{t('Road distance', 'सड़क की दूरी')}</small><b>{arrived ? '0 m' : km(f.remainingMeters ?? distance)}</b></div>
         <div><small>{t('Arrival in', 'पहुँचने में')}</small><b>{arrived ? '—' : f.etaMinutes != null ? `${f.etaMinutes} ${t('min', 'मिनट')}` : '–'}</b></div>
@@ -50,7 +51,8 @@ export default function JourneyPanel({ booking, share, onArrived, onResume }) {
       {!arrived && !within && distance != null && <p className="muted small">{t(`You can confirm arrival within ${Math.round(radius)} m of the address.`, `पते के ${Math.round(radius)} मीटर के अंदर पहुँचकर ‘पहुँच गया’ दबा सकते हैं।`)}</p>}
       <div className="row gap wrap">
         {dest && <button className="btn outline sm" onClick={() => openNavigation(dest.lat, dest.lng)}><Navigation size={16} aria-hidden="true" />{t('Navigate (Google Maps)', 'नेविगेट (Google Maps)')}</button>}
-        {!arrived && <button className="btn primary sm" disabled={busy || !within} onClick={arrive}><CircleCheck size={16} aria-hidden="true" />{t('I have arrived', 'मैं पहुँच गया')}</button>}
+        {!arrived && <button className="btn primary sm" disabled={busy || !within} onClick={() => arrive(false)}><CircleCheck size={16} aria-hidden="true" />{t('I have arrived', 'मैं पहुँच गया')}</button>}
+        {!arrived && !within && <button className="btn outline sm" disabled={busy} onClick={() => arrive(true)}><CircleCheck size={16} aria-hidden="true" />{t('Reached (confirm manually)', 'पहुँच गया (खुद कन्फ़र्म करें)')}</button>}
         {!arrived && sharing && <button className="btn ghost sm" onClick={stop}><Square size={14} aria-hidden="true" />{t('Stop sharing', 'शेयरिंग रोकें')}</button>}
         {!arrived && !sharing && share.status !== 'denied' && <button className="btn ghost sm" onClick={resume}><RefreshCw size={14} aria-hidden="true" />{t('Resume sharing', 'शेयरिंग फिर शुरू')}</button>}
       </div>

@@ -64,7 +64,7 @@ export function useShareLocation(bookingIds, epoch = 0) {
     const onFix = (p) => {
       if (dead) return;
       const acc = p.accuracy ?? 9999;
-      setState((s) => ({ ...s, gps: acc <= 50 ? 'ok' : acc <= cfg.maxAccuracyMeters ? 'weak' : 'weak', accuracy: Math.round(acc) }));
+      setState((s) => ({ ...s, gps: acc <= 50 ? 'ok' : 'weak', accuracy: Math.round(acc), lastFix: { lat: p.lat, lng: p.lng, heading: p.heading, updatedAt: Date.now() } }));
       if (acc > cfg.maxAccuracyMeters) return;    // never send a useless fix
       const now = Date.now();
       for (const id of bookingIds) {

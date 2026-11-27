@@ -135,7 +135,7 @@ export const customerApi = {
   booking: (id) => api(`/bookings/${id}`),
   tracking: (id) => api(`/bookings/${id}/tracking`),
   trackingStart: (id) => api(`/bookings/${id}/tracking/start`, { method: 'POST' }),
-  trackingArrive: (id) => api(`/bookings/${id}/tracking/arrive`, { method: 'POST' }),
+  trackingArrive: (id, manual = false) => api(`/bookings/${id}/tracking/arrive${manual ? '?manual=true' : ''}`, { method: 'POST' }),
   trackingStop: (id) => api(`/bookings/${id}/tracking/stop`, { method: 'POST' }),
   sendLocation: (id, body) => api(`/bookings/${id}/tracking/location`, { method: 'POST', body }),
   trackingConfig: () => api('/tracking/config'),
