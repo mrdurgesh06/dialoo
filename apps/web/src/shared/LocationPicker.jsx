@@ -3,14 +3,14 @@ import { Home, Briefcase, Clock, LocateFixed, MapPin, Search } from 'lucide-reac
 import { customerApi, geoApi } from './api.js';
 import { getPosition } from './native.js';
 import { loadLibrary, mapsConfigured, MAP_ID } from './maps/googleMaps.js';
+import AddressForm from './AddressForm.jsx';
+import { composeAddress as compose, emptyAddress, fromSaved, mergePlace, savePayload, validateAddress } from './addressFields.js';
 import { useT, useToast } from './ui.jsx';
 import '../styles/locpicker.css';
 
 const RECENT_KEY = 'dialoo-recent-locs';
 const readRecent = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } };
 const saveRecent = (r) => { try { const list = [r, ...readRecent().filter((x) => x.address !== r.address)].slice(0, 5); localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch { /* ignore */ } };
-const FIELDS = ['houseNo', 'building', 'landmark', 'locality', 'city', 'district', 'state', 'pincode', 'country'];
-const compose = (f) => [f.houseNo, f.building, f.landmark, f.locality, f.city, f.state && f.pincode ? `${f.state} - ${f.pincode}` : (f.state || f.pincode)].filter((x) => x && String(x).trim()).join(', ').slice(0, 255);
 const moved = (a, b) => !a || !b || Math.hypot((a.lat - b.lat) * 111000, (a.lng - b.lng) * 111000 * Math.cos(a.lat * Math.PI / 180)) > 30;
 
 /**
@@ -22,19 +22,20 @@ const moved = (a, b) => !a || !b || Math.hypot((a.lat - b.lat) * 111000, (a.lng 
  * (through our server, capped + cached) runs once when the map becomes idle after the user moved it, never while it is moving.
  * props: initial {lat,lng}, saved [], debounceMs, onConfirm(result), canSave
  */
-export default function LocationPicker({ initial, saved = [], debounceMs = 400, onConfirm, canSave = true }) {
+export default function LocationPicker({ initial, startAt, initialFields, initialLabel = 'HOME', debounceMs = 400, onConfirm, canSave = true, confirmText }) {
   const t = useT(); const toast = useToast();
   const mapEl = useRef(null); const S = useRef({ interacted: false, lastRev: null, token: null, seq: 0 });
   const [ready, setReady] = useState(false); const [noMap, setNoMap] = useState(!mapsConfigured());
-  const [center, setCenter] = useState(initial || null); const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState([]); const [errs, setErrs] = useState({}); const [pinSet, setPinSet] = useState(!!initial);
+  const [center, setCenter] = useState(initial || startAt || null); const [busy, setBusy] = useState(false);
   const [q, setQ] = useState(''); const [sugs, setSugs] = useState([]); const [searching, setSearching] = useState(false);
-  const [f, setF] = useState(() => Object.fromEntries(FIELDS.map((k) => [k, '']))); const [placeId, setPlaceId] = useState(null); const [cityId, setCityId] = useState(null); const [serviceable, setServiceable] = useState(true);
-  const [label, setLabel] = useState('HOME'); const [save, setSave] = useState(false); const [recent] = useState(readRecent);
+  const [f, setF] = useState(() => ({ ...emptyAddress(), ...(initialFields || {}) })); const [placeId, setPlaceId] = useState(null); const [cityId, setCityId] = useState(null); const [serviceable, setServiceable] = useState(true);
+  const [label, setLabel] = useState(initialLabel); const [save, setSave] = useState(false); const [recent] = useState(readRecent);
   const [err, setErr] = useState('');
 
   const applyPlace = useCallback((p) => {
     setPlaceId(p.placeId || null); setCityId(p.cityId || null); setServiceable(p.serviceable !== false);
-    setF((cur) => ({ ...cur, locality: p.locality || '', city: p.city || p.cityName || '', district: p.district || '', state: p.state || '', pincode: p.pincode || '', country: p.country || (p.cityName ? 'India' : '') }));
+    setF((cur) => mergePlace(cur, p));   // fills area / city / PIN / state; never overwrites house no., building or landmark typed by hand
   }, []);
 
   const reverse = useCallback(async (pos) => {
@@ -52,28 +53,30 @@ export default function LocationPicker({ initial, saved = [], debounceMs = 400, 
       try {
         const { Map } = await loadLibrary('maps');
         if (dead || !mapEl.current) return;
-        const c = initial || { lat: 26.85, lng: 80.95 };
-        map = new Map(mapEl.current, { center: c, zoom: initial ? 17 : 12, mapId: MAP_ID, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy', clickableIcons: false });
+        const c = initial || startAt || { lat: 26.85, lng: 80.95 };
+        map = new Map(mapEl.current, { center: c, zoom: initial ? 17 : startAt ? 16 : 12, mapId: MAP_ID, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy', clickableIcons: false });
         S.current.map = map;
         map.addListener('dragstart', () => { S.current.interacted = true; });
         map.addListener('zoom_changed', () => { S.current.interacted = true; });
         map.addListener('idle', () => {
           const m = map.getCenter(); const pos = { lat: m.lat(), lng: m.lng() };
           setCenter(pos);
-          if (S.current.interacted && moved(S.current.lastRev, pos)) { S.current.interacted = false; reverse(pos); }
+          if (S.current.interacted && moved(S.current.lastRev, pos)) { S.current.interacted = false; setPinSet(true); reverse(pos); }
         });
         setReady(true);
-        if (initial) reverse(initial);
+        if (initial && !initialFields) reverse(initial);   // editing an existing address keeps exactly what the customer already typed
       } catch { if (!dead) setNoMap(true); }
     })();
     return () => { dead = true; };
   }, []); // eslint-disable-line
 
   const goTo = useCallback((pos, zoom = 17) => {
-    setCenter(pos);
+    setCenter(pos); setPinSet(true);
     const m = S.current.map;
     if (m) { S.current.interacted = true; m.setZoom(zoom); m.panTo(pos); } else reverse(pos);
   }, [reverse]);
+
+  useEffect(() => { if (canSave) customerApi.addresses().then(setSaved).catch(() => {}); }, [canSave]);
 
   // ---- Places Autocomplete (New): debounced, session token ----
   useEffect(() => {
@@ -109,24 +112,20 @@ export default function LocationPicker({ initial, saved = [], debounceMs = 400, 
 
   const pickSaved = (a) => {
     if (a.latitude != null) goTo({ lat: Number(a.latitude), lng: Number(a.longitude) });
-    setF((cur) => ({ ...cur, houseNo: a.house_no || '', building: a.building || '', landmark: a.landmark || '', locality: a.locality || '', district: a.district || '', state: a.state || '', pincode: a.pincode || '', country: a.country || cur.country }));
-    setPlaceId(a.place_id || null); if (a.label) setLabel(['HOME', 'OFFICE'].includes(a.label) ? a.label : 'OTHER');
+    setF(fromSaved(a)); setErrs({}); setPlaceId(a.place_id || null); if (a.label) setLabel(['HOME', 'OFFICE'].includes(a.label) ? a.label : 'OTHER');
   };
 
   const confirm = async () => {
-    const address = compose(f) || '';
-    if (!center) return setErr(t('Choose a location first.', 'पहले लोकेशन चुनें।'));
-    if (address.length < 6) return setErr(t('Please complete the address (area, city).', 'कृपया पता पूरा करें (इलाका, शहर)।'));
-    const res = { lat: center.lat, lng: center.lng, address, placeId, cityId, serviceable, label, fields: f, place: { address, locality: f.locality, pincode: f.pincode, cityId, serviceable, cityName: f.city } };
-    if (save && canSave) {
-      try { await customerApi.addAddress({ label, addressLine: address, isDefault: false, latitude: center.lat, longitude: center.lng, placeId, houseNo: f.houseNo, building: f.building, landmark: f.landmark, locality: f.locality, district: f.district, state: f.state, pincode: f.pincode, country: f.country }); }
-      catch (e) { toast(e.message, 'err'); }
-    }
-    saveRecent({ lat: center.lat, lng: center.lng, address, label });
+    const e = validateAddress(f, t); setErrs(e);
+    if (Object.keys(e).length) return setErr(t('Please fill the fields marked with *.', '* वाले फ़ील्ड भरें।'));
+    const address = compose(f);
+    const pos = pinSet && center ? { lat: center.lat, lng: center.lng } : null;   // no pin chosen = no coordinates (never a default map centre)
+    const res = { lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, pinned: !!pos, address, placeId, cityId, serviceable, label, fields: f, place: { address, locality: f.locality, pincode: f.pincode, cityId, serviceable, cityName: f.city } };
+    if (save && canSave) { try { await customerApi.addAddress(savePayload(f, label, pos, placeId)); } catch (e2) { toast(e2.message, 'err'); } }
+    if (pos) saveRecent({ lat: pos.lat, lng: pos.lng, address, label });
     onConfirm(res);
   };
 
-  const set = (k) => (e) => setF((cur) => ({ ...cur, [k]: e.target.value }));
   return (
     <div className="lp">
       {!noMap && (
@@ -150,14 +149,11 @@ export default function LocationPicker({ initial, saved = [], debounceMs = 400, 
       {err && <p className="error" role="alert">{err}</p>}
       {!serviceable && <p className="error">{t('Dialoo is not in this area yet. You can still save the address.', 'Dialoo अभी इस इलाके में नहीं है। फिर भी पता सेव कर सकते हैं।')}</p>}
 
-      <div className="two"><div className="field"><label>{t('House / Flat no.', 'मकान / फ़्लैट नं.')}</label><input value={f.houseNo} onChange={set('houseNo')} maxLength={60} /></div><div className="field"><label>{t('Building / Street', 'बिल्डिंग / गली')}</label><input value={f.building} onChange={set('building')} maxLength={160} /></div></div>
-      <div className="field"><label>{t('Landmark (optional)', 'लैंडमार्क (वैकल्पिक)')}</label><input value={f.landmark} onChange={set('landmark')} maxLength={120} /></div>
-      <div className="two"><div className="field"><label>{t('Locality', 'इलाका')}</label><input value={f.locality} onChange={set('locality')} maxLength={120} /></div><div className="field"><label>{t('City', 'शहर')}</label><input value={f.city} onChange={set('city')} maxLength={80} /></div></div>
-      <div className="two"><div className="field"><label>{t('District', 'ज़िला')}</label><input value={f.district} onChange={set('district')} maxLength={80} /></div><div className="field"><label>{t('State', 'राज्य')}</label><input value={f.state} onChange={set('state')} maxLength={80} /></div></div>
-      <div className="two"><div className="field"><label>{t('PIN code', 'पिन कोड')}</label><input inputMode="numeric" value={f.pincode} onChange={set('pincode')} maxLength={10} /></div><div className="field"><label>{t('Country', 'देश')}</label><input value={f.country} onChange={set('country')} maxLength={60} /></div></div>
+      <AddressForm value={f} onChange={(v) => { setF(v); setErrs({}); }} errors={errs} />
+      {!pinSet && !noMap && <p className="muted small">{t('Tip: move the map so the pin sits on your door. It helps the partner find you and lets you track arrival.', 'सुझाव: मैप हिलाकर पिन अपने दरवाज़े पर रखें। इससे पार्टनर को आपका घर मिलता है और आप उनका आना ट्रैक कर पाते हैं।')}</p>}
       <div className="seg lp-label" role="group" aria-label={t('Address label', 'पते का लेबल')}>{[['HOME', t('Home', 'घर')], ['OFFICE', t('Office', 'ऑफ़िस')], ['OTHER', t('Other', 'अन्य')]].map(([v, l]) => <button type="button" key={v} className={label === v ? 'on' : ''} onClick={() => setLabel(v)}>{l}</button>)}</div>
       {canSave && <label className="lp-save"><input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} /> {t('Save this address', 'यह पता सेव करें')}</label>}
-      <button type="button" className="btn primary block" onClick={confirm} disabled={busy}>{t('Confirm this location', 'यह लोकेशन कन्फ़र्म करें')}</button>
+      <button type="button" className="btn primary block" onClick={confirm} disabled={busy}>{confirmText || t('Confirm this location', 'यह लोकेशन कन्फ़र्म करें')}</button>
     </div>
   );
 }

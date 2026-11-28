@@ -72,9 +72,13 @@ function ConsumerShell({ lang, setLang, user, onNeedLogin, onLogout }) {
   const [picker, setPicker] = useState(false); const pickerDone = useRef(null); const [tcfg, setTcfg] = useState({});
   useEffect(() => { if (user) customerApi.trackingConfig().then(setTcfg).catch(() => {}); }, [user]);
   // Map / search selector. Resolves with the confirmed place (or null when closed). A confirmed choice is never replaced by auto-detect.
-  const pickLocation = () => new Promise((resolve) => { pickerDone.current = resolve; setPicker(true); });
+  const [pickerOpts, setPickerOpts] = useState(null);
+  // opts: { forBooking, initial, startAt, fields, label } - a booking address pick must not change the browsing location in the header
+  const pickLocation = (opts = null) => new Promise((resolve) => { pickerDone.current = resolve; setPickerOpts(opts); setPicker(true); });
   const closePicker = (res) => { setPicker(false); const r = pickerDone.current; pickerDone.current = null; if (r) r(res || null); };
   const onPicked = (res) => {
+    if (pickerOpts?.forBooking) { setPicker(false); const r = pickerDone.current; pickerDone.current = null; if (r) r(res); return; }
+    if (!res.pinned) { closePicker(res); return; }
     const next = { status: 'ok', pos: { lat: res.lat, lng: res.lng }, place: res.place, confirmed: true };
     setLoc(next); try { localStorage.setItem('dialoo-loc', JSON.stringify({ pos: next.pos, place: next.place, confirmed: true })); } catch { /* ignore */ }
     if (res.cityId && res.serviceable) { const c = cities.find((x) => x.id === res.cityId); if (c) { sessionStorage.setItem('dialoo-city-manual', '1'); setCity(c); } }
@@ -181,7 +185,7 @@ function ConsumerShell({ lang, setLang, user, onNeedLogin, onLogout }) {
         <p className="muted small">{t('All Uttar Pradesh cities are listed. More states are coming soon.', 'उत्तर प्रदेश के सभी शहर उपलब्ध हैं। जल्द ही और राज्य आएँगे।')}</p>
       </Sheet>
       <Sheet open={picker} onClose={() => closePicker(null)} title={t('Choose service location', 'सर्विस की लोकेशन चुनें')}>
-        {picker && <LocationPicker initial={loc.pos} saved={[]} debounceMs={tcfg.autocompleteDebounceMillis || 400} canSave={!!user} onConfirm={onPicked} />}
+        {picker && <LocationPicker initial={pickerOpts ? pickerOpts.initial : loc.pos} startAt={pickerOpts ? pickerOpts.startAt : null} initialFields={pickerOpts?.fields} initialLabel={pickerOpts?.label || 'HOME'} debounceMs={tcfg.autocompleteDebounceMillis || 400} canSave={!!user && !pickerOpts?.forBooking} confirmText={pickerOpts?.forBooking ? 'Use this address' : undefined} onConfirm={onPicked} />}
       </Sheet>
       <Checkout target={target} user={user} loc={loc} onLocate={() => detect(true)} onPick={pickLocation} onClose={() => setTarget(null)} />
     </div>
